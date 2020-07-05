@@ -1,0 +1,97 @@
+.container {
+    margin: auto;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    width: 800px;
+    border: 1px solid black;
+    border-radius: 20px;
+    font-size: 16px;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.contactContainer {
+    width: 800px;
+    height: 250px;
+    background-image: url("./image.png");
+    text-align: right;
+    color: white;
+    position: relative;
+}
+
+.headerInfo {
+    width: 500px;
+    text-align: center;
+    float: right;
+    height: 125px;
+}
+
+.contact {
+    width: 440px;   
+    margin-left: 360px;
+    height: 125px;
+    text-align: left;
+    position: absolute;
+    bottom: 0px;
+}
+
+body {
+    font-size: 16px;
+}
+
+table {
+    position: absolute;
+    bottom: 10px;
+}
+
+table tbody .extraSpace {
+    padding-left: 30px;
+}
+
+p {
+    margin: 0px;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+p.info {
+    margin: 0;
+    margin-top: 5px;
+}
+
+h1 {
+    margin: 0;
+    padding-top: 20px;
+    font-size: 36px;
+    color: black;
+}
+
+h2 {
+    font-size: 28px;
+    margin-left: 20px;
+    text-decoration: underline;
+    margin-top: 50px;
+}
+
+h3 {
+    font-size: 20px;
+    margin-left: 20px;
+    text-decoration: underline;
+    margin-top: 30px;
+}
+
+ul {
+    margin-top: 5px;
+}
+
+ul.publications li {
+    margin-top: 10px;
+}
+
+a {
+    color: black;
+}
+
+a.chalmersInfo {
+    color: #546B73;
+    background: rgba(238, 238, 238, 0.5);
+}

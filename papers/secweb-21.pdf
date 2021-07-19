@@ -1,0 +1,2670 @@
+\documentclass[compsoc,conference,a4paper,10pt,times]{IEEEtran}
+% \IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+
+%%% Imports
+\usepackage{xspace}
+\usepackage{enumerate}
+\usepackage{listings}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{url}
+
+%%%%%%%%%%%% JavaScript %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{color}
+\definecolor{lightgray}{rgb}{.9,.9,.9}
+\definecolor{darkgray}{rgb}{.4,.4,.4}
+\definecolor{purple}{rgb}{0.65, 0.12, 0.82}
+
+\lstdefinelanguage{JavaScript}{
+  keywords={typeof, new, true, false, catch, function, return, null, catch, switch, var, if, in, while, do, else, case, break, let},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={class, export, boolean, throw, implements, import, this},
+  ndkeywordstyle=\color{darkgray}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=false,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{purple}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
+\lstset{
+   language=JavaScript,
+   %backgroundcolor=\color{lightgray},
+   extendedchars=true,
+   basicstyle=\footnotesize\ttfamily,
+   showstringspaces=false,
+   showspaces=false,
+   numbers=none,
+   numberstyle=\footnotesize,
+   numbersep=9pt,
+   tabsize=2,
+   breaklines=true,
+   showtabs=false,
+   captionpos=b
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% to center some captions...
+\usepackage{caption}
+\usepackage{subcaption}
+
+\usepackage{gnuplottex}
+
+
+%% Only needed for todos
+\usepackage{color}
+\newcommand{\todo}[2]{\leavevmode\color{red}[TODO(#1): #2]\color{black}}
+\newcommand{\idea}[2]{\leavevmode\color{blue}[IDEA(#1): #2]\color{black}}
+
+\newcommand{\name}[1]{EssentialFP\xspace}
+
+\input{acronyms.tex}
+\input{abbr.tex}
+\input{data.tex}
+
+%%% The \PassOptionsToPackage{hyphens}{url} will allow for linebreaks in long URLs
+%\PassOptionsToPackage{hyphens}{url}
+\usepackage[hidelinks,colorlinks=false]{hyperref}
+%%% Seems to be needed for a reaaaaaaally long url in the references.
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\UrlOrds}
+\makeatother
+
+\usepackage{cleveref}
+
+%% \smallskip can be replaced to, e.g., \vspace{2mm} to get rid of the nasty white space on the first page.
+\newcommand{\para}[1]{\smallskip\noindent\textbf{#1.}}
+
+%%% SecWeb Workshop submission
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+%%% END
+
+\makeatletter
+\newcommand{\linebreakand}{%
+  \end{@IEEEauthorhalign}
+  \hfill\mbox{}\par
+  \mbox{}\hfill\begin{@IEEEauthorhalign}
+}
+\makeatother
+
+\begin{document}
+
+\author{%
+  \IEEEauthorblockN{Alexander Sj{\"o}sten\IEEEauthorrefmark{1}\IEEEauthorrefmark{2}}
+  \and
+  \IEEEauthorblockN{Daniel Hedin\IEEEauthorrefmark{1}\IEEEauthorrefmark{3}}
+  \and
+  \IEEEauthorblockN{Andrei Sabelfeld\IEEEauthorrefmark{1}}
+  \linebreakand
+  \IEEEauthorblockA{%
+    \IEEEauthorrefmark{1}Chalmers University of Technology\\
+    \IEEEauthorrefmark{2}TU Wien\\
+    \IEEEauthorrefmark{3}M\"alardalen University
+  }%
+}%
+
+\newcommand{\tit}{EssentialFP: Exposing the Essence of Browser Fingerprinting}
+\title{\tit}
+%\subtitle{...}
+
+ %Title alternatives:
+%FingerPoint: Spotting Browser Fingerprinting on the Web
+%ThumbsUp: Taming Browser Fingerprinting
+%All You Need is Glove: Protecting against Browser Fingerprinting on the Web
+
+\maketitle
+
+\begin{abstract}
+  Web pages aggressively track users for a variety of purposes from targeted
+  advertisements to enhanced authentication.  As browsers move to restrict
+  traditional cookie-based tracking, web pages increasingly move to tracking
+  based on browser fingerprinting. Unfortunately, the state-of-the-art to
+  detect fingerprinting in browsers is often error-prone, resorting to imprecise
+  heuristics and crowd-sourced filter lists.
+%
+  This paper presents \name{}, a principled approach to detecting
+  fingerprinting on the web. We argue that the pattern of
+(i) gathering information from a wide browser API surface (multiple browser-specific sources) and (ii) communicating the information to the network (network sink)
+  captures the essence of fingerprinting. This pattern enables us to clearly
+  distinguish fingerprinting from similar types of scripts like analytics and
+  polyfills. We demonstrate that information flow tracking is an excellent fit
+  for exposing this pattern. To implement \name{} we leverage, extend, and
+  deploy JSFlow, a state-of-the-art information flow tracker for
+  JavaScript, in a browser. We illustrate the effectiveness
+  of \name{} to spot fingerprinting on the web by
+  evaluating it on two categories of web pages: one where the web pages perform
+  analytics, use polyfills, and show ads, and one where the web pages perform
+  authentication, bot detection, and fingerprinting-enhanced Alexa top pages.
+\end{abstract}
+
+\begin{IEEEkeywords}
+web security and privacy, browser fingerprinting, JavaScript, information flow
+\end{IEEEkeywords}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% 2 pages
+\section{Introduction}
+\label{sec:intro}
+
+%% General stuff...
+Web pages aggressively track users for a variety of purposes such as
+targeted advertisement, enhanced security, and personalized content~\cite{DBLP:conf/ccs/EnglehardtN16}. Web tracking is subject to much debate~\cite{unsanctioned-tracking,mitigating-fingerprinting-specifications} that, in the light of privacy-enhancing legislation~\cite{GDPR}, has led the major browser vendors to introduce anti-tracking measures.
+
+\para{From cookies to fingerprinting}
+While cookies were, traditionally, used to keep track of users, a growing awareness of privacy concerns (e.g., the
+``do not track'' flag~\cite{do-not-track}) has made cookies less efficient as the only means of tracking as
+shown by Yen \etal~\cite{DBLP:conf/ndss/YenXYYA12}.
+%
+%; a study by Yen \etal showed 32\% of
+%the users could not be completely tracked using only cookies~\cite{DBLP:conf/ndss/YenXYYA12}.
+%
+%
+To compensate, web pages are moving to collect \emph{browser
+  fingerprints}, where seemingly benign browser features can be
+combined to uniquely identify users~\cite{DBLP:journals/tweb/LaperdrixBBA20}.
+%
+Recent studies show that (i) browser fingerprinting is becoming increasingly
+prevalent~\cite{DBLP:conf/ccs/AcarEEJND14,DBLP:conf/ccs/EnglehardtN16};
+(ii) modern techniques include hardware fingerprinting through the
+Canvas~\cite{Mowery2012PixelP} and WebGL~\cite{Mowery2012PixelP,DBLP:conf/ndss/CaoLW17}
+APIs; and (iii) on average, a fingerprint can track a browser
+instance for 54.48 days~\cite{DBLP:conf/sp/VastelLRR18}.
+%
+Today there are several open-source browser fingerprinting libraries,
+such as \fpjs~\cite{fingerprintjs}, \imprintjs~\cite{imprintjs}, and
+\clientjs~\cite{clientjs}, where \fpjs is the most updated and
+supersedes \imprintjs and \clientjs to a large extent.
+%
+These libraries are highly configurable, allowing developers to define
+what specific browser features should be used
+by enabling flags corresponding to the desired features.
+%
+%This allows for creating a trade-off between uniqueness and stability.
+%In general, a large fingerprint promotes uniqueness at the cost of stability, while
+%also being easier to detect, also for the more
+%crude detection mechanisms that are presently available.
+%
+From analyzing newer data, researchers have also shown that the number
+of uniquely identifiable users based on the fingerprint has gone
+down. However, these non-unique fingerprints are fragile, and if a user
+modifies a few features of the fingerprint, there is a high probability the
+fingerprint will become unique~\cite{DBLP:conf/www/Gomez-BoixLB18}.
+
+
+\para{Privacy-violating fingerprinting}
+As with tracking in general, web pages fingerprint users for a variety of purposes.
+%Fingerprinting used to track users is naturally ``bad''
+%fingerprinting, since it violates a user's privacy.
+%
+%With the privacy threat of the ``bad'' browser fingerprinting, there
+%have been several approaches to limit the impact of browser
+%fingerprinting.
+To thwart the privacy-violating fingerprinting efforts
+browser vendors have proposed mitigations, which include
+randomizing the output of known fingerprinting
+vectors by Brave~\cite{brave-anti-fp}, using privacy
+budgets by Chrome~\cite{chrome-anti-fp}, blocking third-party requests suspected
+of being tracking related by Edge~\cite{edge-anti-fp} and Firefox~\cite{firefox-anti-fp} based on,
+e.g., the Disconnect list~\cite{disconnect}, and making more devices look
+identical by Safari~\cite{safari-anti-fp}.
+The diversity of these techniques shows that each comes with its own pros and cons, with no clear principle on how to detect fingerprinting. This is
+further reflected in a large number of both false positives and negatives~\cite{disconnect-issues,easylist-unblock,easylist-issues,brave-issues}.
+
+
+In addition to the effort in limiting tracking and fingerprinting by browser vendors,
+a user can install browser extensions like AdBlock, Privacy Badger, or Ghostery
+to help
+block privacy-intrusive scripts.
+%
+These extensions use techniques ranging from crowd-sourced filter lists (collections of
+rules dictating what should be blocked), analyzing behavior, and using anonymous data from the users.
+%
+As an example, the crowd-sourced filter lists have the
+obvious limitations: to keep the filter
+lists up-to-date is time-consuming, and when fingerprinting scripts are 
+added to the filter lists they can easily be evaded by serving them from
+different Internet domains~\cite{dga}.
+%
+
+Recent research approaches to limit fingerprinting include
+randomization of
+features~\cite{DBLP:conf/www/NikiforakisJL15,DBLP:conf/essos/LaperdrixBM17,DBLP:conf/uss/TrickelSKND19},
+modifying the fingerprint per
+session~\cite{DBLP:conf/esorics/TorresJM15,DBLP:conf/dbsec/FaizKhademiZW15},
+and making users look identical through
+virtualization~\cite{DBLP:conf/icse/LaperdrixRB15,DBLP:conf/ccs/Gomez-BoixFBB19}.
+%Yet
+%making every user look unique or making users look identical to prevent fingerprinting also
+%breaks techniques that use fingerprinting to improve security, e.g., to make authentication stronger~\cite{DBLP:conf/dimva/LaperdrixABN19}.
+%
+We discuss these and further related approaches in \Cref{sec:related-work}.
+%
+
+As seen above, current techniques for fingerprint detection focus on 
+specific vectors. Hence, they fall short of addressing the general case: there is
+currently no uniform solution for identifying fingerprinting.
+This leads us to our first research question: \emph{RQ1: What is the essence of browser fingerprinting?}
+
+
+\para{Different types of fingerprinting}
+What makes the problem of fingerprinting intricate is that not all fingerprinting is ``bad'' fingerprinting~\cite{DBLP:journals/tweb/LaperdrixBBA20}.
+%
+Indeed, fingerprinting can be justified to increase security when used to improve
+e.g. bot detection, fraud detection, and protection against account
+hijacking~\cite{DBLP:conf/ccs/AcarJNDGPP13}.
+%
+Where to draw the line between ``bad'' and ``good'' fingerprinting is an open and arguably subjective question.
+Approaches that try to draw this line are bound to result in both false positives and negatives.
+
+The stance of this paper is thus neutral: we focus on identifying the \emph{presence} of fingerprinting, hence providing necessary input into the decision process (by the user and browser) on
+whether to allow it or not.
+%
+This motivates our second research question: \emph{RQ2: How do we reliably expose fingerprinting scripts in a principled way, without relying on ad-hoc heuristics and crowd-sourcing, while at the same time not having to judge the fingerprinting as ``bad'' or ``good''?}
+
+
+\para{Fingerprinting}
+%
+Our key observation is that the essence of fingerprinting can be captured by:
+(i) gathering information from a wide browser API surface (the \emph{\fppattern}) and (ii)
+communicating the information to the network (network sink). The communication in (ii) may either
+be direct (via, e.g., \texttt{XMLHttpRequest}) or indirect (via, e.g., the cookie) and may be
+done by sending the raw data piece by piece or (more commonly) as a precomputed fingerprint.
+
+%One natural start for semantic detection of fingerprinting is with the gathered information, i.e,
+%the API surface accessed by fingerprinting code (the \emph{\fppattern}). It may be indicative of
+%fingerprinting if the information that is sent to a network sink
+%has a significant overlap with the \fppattern.
+The \emph{flow} of information is key to reliable detection: we must track how information flows from
+the \fppattern to the network sinks. Only looking at an application's \pattern does not suffice due to the risk for false positives (every use of the API would count towards fingerprinting). 
+%
+In particular, in the presence of \emph{polyfills}, the \apatterns naturally become rather large, thus increasing the risk of false
+positives significantly.\footnote{Polyfills, such as Modernizr~\cite{modernizr} and
+core-js~\cite{corejs}, are libraries
+intended to extend older browsers with support for new features. To be able to do this
+they probe and enhance the execution environment by injecting any missing features.}
+
+
+
+%% Our approach: Lightweight IFC
+\para{Lightweight information flow control}
+%
+Based on this,
+we propose \name{}, a principled approach that utilizes dynamic \gls*{IFC}
+as a means to expose fingerprinting.
+%
+\name{} utilizes a variant of dynamic \gls*{IFC} known as
+\emph{observable tracking}~\cite{DBLP:conf/esorics/BalliuSS17,DBLP:conf/plas/StaicuSBPS19}.
+%
+%Observable tracking is an excellent match to capture the essence of fingerprinting.
+By labeling the values originating from the \fppattern with their access paths and capturing
+(the accumulation) of labels exfiltrated via network sinks, observable tracking
+ensures that all important flows are correctly accounted for.
+%
+%To track how information flows from the \fppattern to the network sinks we
+%label the values originating from the \fppattern with their access paths and capture
+%(the accumulation) of labels exfiltrated via network sinks. Observable tracking
+%ensures that the accumulated label correctly reflects all important flows.
+% The observable tracking
+%ensures that the internal flow of information in the program correctly reflects any
+%flow of information from the \fppattern to the network.
+%
+We implement this approach in
+JSFlow~\cite{DBLP:journals/jcs/HedinBS15},
+a state-of-the-art dynamic \gls*{IFC} monitor for \JSFlowEcma that allows fine-grained information flow
+tracking.
+%
+Although IFC techniques can be extended to handle timing and other
+side-channel attacks, \jsflow does not support this; such attacks are, thus, currently out of
+scope for \name{}.
+
+%% \para{Metrics via aggregated labels}
+%% %
+%% To detect fingerprinting we accumulate the labels that reach each of the network sinks
+%% and compare the result against a baseline \fppattern computed from the
+%% \fppatterns of three major open-source fingerprinting libraries to find the largest sink.
+%% The overlap between the largest sink and the \fppattern gives us
+%% how large part of a full fingerprint that escapes the browser to the fingerprinting party.
+%% The hypothesis is that fingerprinting applications have a larger overlap than other non-fingerprinting
+%% applications.
+%% %
+%% In addition, we also gather all internally created labels. This set of labels
+%% represent the values created during executions and allows us to detect whether the
+%% script itself compiles information from the baseline \fppattern into one value, i.e.,
+%% a fingerprint.
+%% %
+%% Having information on how much fingerprinting information that reaches the API and
+%% if this information was compiled by the page or sent piece by piece allows us to
+%% gain further insights into how fingerprinting operates in the wild.
+
+%% \para{Implementation and evaluation}
+%% Our approach leverages
+%% JSFlow~\cite{DBLP:conf/csfw/HedinS12,DBLP:conf/sac/HedinBBS14,DBLP:journals/jcs/HedinBS15},
+%% a state-of-the-art dynamic \gls*{IFC} monitor for \JSFlowEcma.
+%% %
+%% We extend JSFlow to handle libraries not natively supported by \JSFlowEcma and
+%% modify Chromium to use \jsflow to execute scripts instead of \veight. The resulting browser,
+%% \chromiumjsflow, allows us to visit pages while tracking and collecting data
+%% about the flows of information on the page.
+
+%% To evaluate the effectiveness of our approach we have selected a number of web pages divided into two
+%% %% hmm they do overlap as several categories to fingerprinting
+%% %non-overlapping
+%% categories: \textit{non-fingerprinting} and \textit{fingerprinting}.
+%% To see how intrusive non-fingerprinting web pages can be, we selected web pages
+%% which run analytic scripts, polyfills, and serve ads but do not contain any 
+%% traditional fingerprinting scripts. Analytic scripts and ad networks are an 
+%% excellent match for the purposes of our evaluation because they will allow us 
+%% to demonstrate that our approach can distinguish fully-fledged fingerprinting 
+%% from ``superficial'' fingerprinting varieties used by analytic scripts and ad 
+%% networks.
+%% The fingerprinting web pages are chosen based on three different classes of
+%% fingerprinting, namely pages that perform authentication, pages that perform bot
+%% detection, and pages that fingerprint for other reasons.
+%% Each web page was then executed using \chromiumjsflow and the collected data analyzed w.r.t. the
+%% baseline \fppattern. Our results show a clear distinction between the non-fingerprinting and the fingerprinting
+%% category of pages where fingerprinting pages reach scores of 20\% and above, while all non-fingerprinting pages fall
+%% well under 20\%.
+%% %% For bot detection and authentication the results are more subtle due to variations in how
+%% %% much fingerprinting is used to enhance the security.
+
+\para{Scope}
+We would like to stress that our work is a
+\emph{feasibility study} rather than a \emph{scalability study}.
+%
+The first step before deciding whether a high-performance monitor can
+be integrated into an existing \JS runtime is to understand what
+security and privacy benefits it will bring.
+%
+Our
+focus is on providing a platform for experimenting with and providing a
+deep understanding of \JS on web pages; large-scale evaluation on thousands of web pages is not in scope
+of this work.
+%
+This is in line with previous
+work on information-flow tracking for
+JavaScript~\cite{DBLP:conf/sp/DevrieseP10,DBLP:conf/csfw/HedinS12,DBLP:conf/post/BichhawatRGH14,DBLP:journals/jcs/HedinBS15}
+whose strength is a deep understanding of JavaScript behavior rather
+than approximative analysis of thousands of pages.
+%
+% Studying these benefits
+%is the main goal of this work, opening up for scalability studies in
+%future work.
+%
+%
+Future work on scalability will have its own challenges because existing \JS runtimes such as \veight are fast-moving targets
+with a focus on advanced performance optimizations. Yet, an encouraging
+indication is that 
+Bichhawat \etal instrumented WebKit's \JS engine to implement dynamic IFC, with
+an average performance overhead of roughly
+29\%~\cite{DBLP:conf/post/BichhawatRGH14}, showing it is possible to implement
+dynamic IFC with a tolerable overhead.
+%
+%Unfortunately, existing \JS runtimes such as \veight are fast moving targets
+%with a focus on advanced performance optimizations.
+%
+%By using \jsflow we get a stable implementation to experiment with, albeit
+%without any optimizations.
+%
+%Due to this, a large-scale evaluation on thousands of web pages is not in scope
+%of this work, but implementing dynamic IFC in \veight with performance
+%optimization is an interesting avenue for future work.
+%
+
+\para{Contributions}
+In summary, this paper offers the following contributions:
+\begin{enumerate}[(i)]
+  \item We develop \name, a principled approach to fingerprinting detection based on observable tracking
+    (\Cref{sec:approach}), define the sources and sinks, and design a metric that allows us to characterize fingerprinting patterns via aggregated labels.
+  \item We present the design and implementation of \name{} to
+    allow JSFlow to track information within web APIs, and how to track
+    label combinations of known fingerprinting patterns
+    (\Cref{sec:design}).
+  \item We present an empirical study, where we visit web pages based
+    on different categories (non-fingerprinting and fingerprinting), demonstrating the effectiveness of \name{} (\Cref{sec:study}).
+\end{enumerate}
+
+The code of our tool and its benchmarks are available online~\cite{glove}.
+
+%% \subsection{Fingerprinting is important}
+
+%% \subsubsection{From Cookies to Fingerprinting}
+
+%% \subsubsection{“Bad” vs.”Good” Fingerprinting}
+
+%% \subsection{Existing approaches}
+
+%% \subsubsection{Browsers}
+%% All major browsers performs some kind of anti-fingerprinting.
+%% %
+%% All of them use lists with known fingerprinting sources, but Brave
+%% also randomize parts of the methods used by fingerprinting APIs.
+
+%% Other things to check: Privacy Budgets~\cite{privacy-budget}
+
+
+
+%% %%% The filter lists are crowd sourced
+%% \subsubsection{Filter Lists}
+%% There are many lists for different situations out there~\cite{filterlists}.
+
+%% \paragraph*{EasyPrivacy}
+%% \cite{easylist}
+
+%% \paragraph*{Disconnect}
+%% \cite{disconnect}
+
+%% \subsubsection{Research Approaches}
+
+%% Somewhere, we need to discuss that
+%% OpenWPM~\cite{DBLP:conf/ccs/EnglehardtN16,openwpm-github} allows for recording
+%% all method calls (with arguments) and property accesses for APIs of potential
+%% fingerprinting interest.
+%% %
+%% However, it is not clear if we get can easily get aggregated data from there
+%% (which we should get via IFC), or if that is something one must handle by
+%% themselves.
+
+%% %% perhaps partly up to intro
+%% \subsubsection{Limitations with current approaches}
+
+%% TODO: rewrite in a neutral fasion.
+
+%% no connection between sources and sinks. applications may have a justified large
+%% fingerprint w.r.t. api. need to use width etc to know how to render,
+%% need to use canvas to render if containing some form of graphics, might need to use
+%% webgl, e.g., a 3d modeling programme, add to that support for the user
+%% to store information and the program's API pattern is to a large extent overlapping
+%% with the one of Fingerprinting
+
+%% API patterns lead to potential  false positives blocking perfectly legitimite programs
+
+%% even if this could be fixed, e.g. tracking API pattern per script file, there
+%% are legitimate uses of Fingerprinting to e.g. protect a page.
+
+%% plethora of browsers. support different things. older versions still in use
+%% and do not support new features of js. to be able to benefit from
+%% the new version of its common to use polyfills. polyfills probes the environment
+%% and inserts implementations of things to create a more modern execution enviornment)
+%% (e.g. modernizer, babel together with core-js). this naturally leads to a large
+%% API fingerprint that overlaps with and can be misidentified as fingerprinting.
+%% indeed, it is a type of fingerprinting to detect what is supported and what is
+%% not to be able to enhance the exectution env.
+
+%% polyfills are prevalent. mistdetecting polyfills leads to a large number of false
+%% positives.
+
+%% further a service might want
+%% to detect bots, or otherwise identify a platform to e.g./
+%% banks try to identify platforms to detect potential .. TODO more
+
+%% in all those cases the issue is the risk for false positives. the potential
+%% remedy to distinguish between benign and malicious use by e.g., using differences
+%% in API patterns (fingerprinting is typically in one script, but so are polyfills)
+%% polyfills typically have a larger API pattern than fingerprinting - use this to distinguish
+%% may work in the short term, but is easily circomvented by a fingerprinting script
+%% (spread out fingerprinting, make API pattern larger)
+
+%% indeed, since there are legitimate uses of fingerprinting its unlikely that it
+%% is possible to distinguish between benign and malicious uses by just identifying the
+%% presence - we need to distinguish the behavior after fingerprinting.
+
+
+%% \subsection{Our Approach: Lightweight IFC}
+
+%% the importance is not wheter a script is fingerprinting or not. the key is what it
+%% uses the information gatheter for. its fine for a program to have a large api fingerprint
+%% if this is needed to implement the application, its fine to fingerprint to polyfills
+%% and its fine to perform fingerpriting to protect the user or the application
+%% itself from attacks.
+
+%% all those uses cases share that the fingerprinting information is used by the application
+%% itself, but never leaves the browser. this is unlike malicious uses of
+%% fingerprinting where information is gathered and passed on to a 3rd party for
+%% to e.g. track the same user across multiple pages
+
+%% TODO NOTE: use of fingerprinting for payload selection is problably to a certain extent similar
+%% to polyfills. we might want to disucss this in limitations
+
+%% \subsubsection{Fingerprinting Patterns}
+
+%% the key here is that the fingerprint information leaves the browser and is sent
+%% to somewhere else. today's fingerprinting scripts typically first gather
+%% information that is then combined using some kind of hash computation into a
+%% fingerprint that is then sent. however, even though this is the current behavior
+%% no protection mechanism can rely on the accumulation of all information into one
+%% transferred piece of information. it is just as easy for a fingerprinter to
+%% exfiltrate the information piece by piece. hence, its the accumulated information
+%% that leaves the browser that is of interest.
+
+%% this is where information flow control enters the game. IFC allows us to track
+%% iformation from sources to sinks. this way we can identify a typical fingerprint
+%% API pattern, and warn/stop execution only when the pattern is misued, i.e.,
+%% when it leaves the browser.
+
+%% TODO fureth down, numeorus ways, weighted, e.g. difference between accumulated leak
+%% and piece by piece. when do we stop?
+
+%% \subsubsection{Observable Tracking}
+
+%% IFC is typically contrasted with discretionary access control.  DAC
+%% either grants or does not grant access to a piece of information and leaves it
+%% to the receiver of the information to not mistreat the information in any way without
+%% further means of enforcement. Historically, this has lead to numerous issues
+%% where information has been been stolen or altered wither by accident or malice.
+%% IFC remedies this situation by not neccessarily preventing access to sensitive information
+%% but rather tracking what the application does with the information it actually is
+%% accessing. in case the use is benign execution proceeds normally, but in case
+%% the information is misused (exfiltration or tampering, e.g.) execution is stopped
+%% with a security error.
+
+%% there are a multitue of variations of IFC that differ in the way inforamtion is tracked
+%% and what kind of formal security condition is achieved. different
+%% approaches fit different scenarios and in this work we have opted for
+%% dynamic information flow control. in dynamic IFC the information flow is
+%% tracked runtime, typically by tagging values with a security level that is
+%% updated during execution to reflect how the value was formed, i.e., what
+%% information it aggregates. in general we demand that the security levels form a lattice to allow
+%% for the comuptation of such aggregations. in this work we use sets of origins as the security labels. we refer the reader to TODO for more information-flow
+%% on information flow control.
+
+%% more specifically we implement a variant of dynamic information flow control known
+%% as obervable tracking together. observable tracking in a lightweight form of IFC where
+%% execution is not stopped by bad implicit flows. implicit flows are what is
+%% known outside the security community under the name control flows, i.e., where
+%% values are depending on the execution of the program.
+
+%%  Consider the following
+%% small program that contains an implicit flow from a to b
+
+%% if (a) { b = true; } else { b = false;}
+
+%% if a i a boolean variable, the above implcit flow is equivalent to the explicit
+%% flow a = b, i.e., the result is copying the contents of a into b. in general,
+%% implicit flows are just as powerful as explicit flows; copying information
+%% using implcit flows can easily be done bitwise using a variation of the implicit
+%% flow above. in observable tracking, implicit flows are taken care of by
+%% tracking the security context of the control flow and raising any side effects
+%% to the label of the control flow. in the above example,
+%% the execution of the body of the conditional is done in the security context of a
+%% which would cause the value stored in b to be labeled with the security label of
+%% a. this way the fact that the value of b is indirectly influensed by the value of
+%% a is recorded. the tracking of implicit flows is what set full IFC apart from
+%% taint tracking that only tracks direct flows.
+
+%% we call observable tracking lightweight IFC since it allows values all values to
+%% be influensed regardless of the security level of the context. if b
+%% in the example above initially did not share security level with a it will after the
+%% execution of the conditional. unfortunately, this liberal way of tracking inforamtion
+%% flow does not allow for strong security guarantees. the reason for this is that it
+%% it allows for inforamtion flow into the label of values. consider e.g. the following
+%% variation of the above program
+
+%% b = false; if (a) { b = true; }
+
+%% in case a is false b will retain its value and security level, whereas if
+%% a is true b will inherit the security label of a. this, the security label of b
+%% is depending on the value of a. unfortunately, this allows for a directed attack
+%% against against the information flow tracking. the remedy is a more conservative
+%% approach where implicit flows are not allowed to raise the security level of
+%% values known as NSU (cite). NSU gives provable security, but at the cost of
+%% significatly more complex information flow tracking. For this reason, we have
+%% opted to use observable tracking. while it does not give formal security guarantees
+%% current web pages do not contain code to avoid observable tracking (the circumvention
+%% is highly specialized and does not arise in normal programming) while they do
+%% contain a plethora of implicit flows (that do arise in ordinary programming).
+%% if IFC is to be used as a reliable detection mechanism and protection mechanism
+%% one with provable security must be selected. For the current setting observable
+%% tracking is sufficient and gives an edge over other other protection mechansims as
+%% taint tracking or API patterns.
+
+%% \subsection{Contributions}
+%% In summary, this paper offers the following contributions:
+%% \begin{enumerate}[(i)]
+%%   \item Contribution
+%%   \item Another contribution
+%%   \item A third contribution
+%% \end{enumerate}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%
+%As an example, for user identification two factors are important for the fingerprint: 1)
+%uniqueness and 2) time stability~\cite{DBLP:conf/acsac/AlacaO16}.
+%
+%If the produced fingerprint is not unique, users that share the
+%same fingerprint will be mistakenly identified.
+%
+%Similarly, if the fingerprint is not stable the same user will appear
+%to be different users.
+
+
+
+\section{Observable Information-Flow Control}
+There are various forms of \gls*{IFC}, all sharing the same
+fundamental concepts but differing in how information is tracked and
+what security guarantees they provide. This paper utilizes observable \gls*{IFC}
+and we refer the reader to
+\cite{DBLP:journals/jsac/SabelfeldM03,DBLP:series/natosec/HedinS12} for other common variants.
+%
+
+Observable \gls*{IFC} is a form of dynamic \gls*{IFC}, i.e., that takes place at runtime. Dynamic analyses have 
+the benefit of being able to handle the challenges posed by \JS including 
+ dealing with obfuscation and minification, two prevalent techniques
+that are known to cause issues for static analyses.
+
+To track how the information flows all values are given a runtime
+security label.
+%
+The security labels of values taking part in a computation are modified during execution to reflect the flow of information caused by the computation.
+%
+This is done by tracking two types of information flows:
+\emph{explicit} and \emph{implicit} flows.
+%
+Explicit flows correspond to data
+flows~\cite{DBLP:journals/cacm/DenningD77} in traditional program
+analysis, and occurs when one or more values are combined into a new
+value.
+%
+Implicit flows correspond to control
+flows~\cite{DBLP:journals/cacm/DenningD77} in traditional program
+analysis, and occurs between values when one value indirectly
+influences another value via the control flow of the program.
+
+Similar to many other \gls*{IFC} techniques, observable tracking maintains a security label associated with the
+control flow, the so-called \emph{pc} label, to track implicit flows.
+%
+The \emph{pc} label is used to ensure any values influencing the
+control flow are taken into account when computing the labels of side
+effects.
+%
+Implicit flows in an application are not only of theoretical
+importance~\cite{DBLP:conf/ccs/JangJLS10,DBLP:conf/plas/StaicuSBPS19}.
+%
+If implicit flows are not tracked, important flows are missed.
+%
+Consider the following code taken from \fpjs.
+%
+\vspace{-1mm}
+\begin{lstlisting}
+  var getNavigatorPlatform = function (options){
+    if (navigator.platform) {
+      return navigator.platform
+    } else {
+      return options.NOT_AVAILABLE
+    }
+  }
+\end{lstlisting}
+%
+%
+If \texttt{navigator.platform} is present, there is an observable
+implicit flow from it to the return value of the function.
+%
+This code snippet from \fpjs represents a common pattern where the
+link between the original API source and the sink would be lost in the
+negative case.
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Approach}
+\label{sec:approach}
+%
+To allow \name{} to detect browser fingerprinting, our approach
+relies on a precomputed baseline \fppattern that captures all parts of
+the API that contain fingerprinting-sensitive information.
+%
+This is used to label any information that originates from
+the baseline \fppattern with the access path, causing all
+fingerprinting-sensitive information to carry its origin as a security
+label.
+%
+During execution, the observable tracking ensures values that reach
+the network sinks are correctly labeled.
+%
+This approach is more robust compared to, e.g.,
+OpenWPM~\cite{openwpm-github,DBLP:conf/ccs/EnglehardtN16} that instruments
+access to the \JS API, links every access to the corresponding script, and
+stores everything in a database for offline analysis, since it does not 
+implicitly assume that access equates exfiltration. As discussed above, this
+is important in the presence of, e.g., polyfills, that have large \apatterns but
+do not exfiltrate any information.
+%
+Similar to OpenWPM, the analysis of the collected labels in our approach is done after the execution of the page, but nothing prevents
+a runtime solution where information would be allowed to be exfiltrated until a certain threshold has been met.
+Such a solution would be related to the use of a \emph{privacy budget}~\cite{privacy-budget}, with the difference
+that it measures the budget on the information exfiltrated from the browser, rather than the read information.
+
+\subsection{Computing the \fppattern}
+%
+In order to create the baseline \fppattern locally,
+we use three known and widely used open-source fingerprinting
+libraries: \fpjs~\cite{fingerprintjs}, \imprintjs~\cite{imprintjs},
+and \clientjs~\cite{clientjs}.
+%
+It is worth noting that a full list of sources for entropy would be ideal, but this information 
+is not readily available. By using the three aforementioned libraries 
+a high-quality approximation that captures the state-of-the-art in fingerprinting is possible.
+%and the overall approach is compatible with other fingerprinting libraries.
+%
+
+The baseline \fppattern is computed by combining the \fppatterns of \fpjs, \imprintjs, and
+\clientjs running in isolation on pages crafted for the purpose.
+%This was done by creating specialized web pages for each library containing only the fingerprinting code. Each such page was then executed while labeling the results of all API accesses with their access paths.
+%This way, the \fppattern of each of the libraries could be read directly from the label of the resulting fingerprint as a set of access paths.
+%
+The \fppatterns for \fpjs and \imprintjs were generated by executing
+the respective library with all fingerprinting features turned on.
+%
+As \clientjs does not have the same configurability the \fppattern was
+generated by calling the \clientjs function \texttt{getFingerprint}.
+%
+%The three resulting sets of \fppatterns were then combined to form the
+%final baseline \fppattern.
+
+Further, to be able to analyze the kind of fingerprinting detected, \fppatterns
+for each feature of \fpjs and \imprintjs were also created.
+
+\subsection{Detecting Fingerprinting}
+
+The baseline \fppattern identifies the part of the execution environment that contains fingerprinting-sensitive information. By
+labeling all values originating from this part with the access path, tracking the information flow dynamically, and monitoring the label creation and flow during the execution we are
+able to detect fingerprinting in applications. For each page and API endpoint, we accumulate the labels of all values reaching the endpoint.
+From this set of endpoints, we select the potential network sinks, i.e., endpoints that can be used to communicate information, such as \texttt{XMLHttpRequest}, or store information which can be transmitted, such as \texttt{document.cookie}.
+%
+%%% DANIEL: I connented out this since it points out an obvious limitaition and was rather speculative. Was this as an answer to a reviewer? 
+%%% ANDREI, ALEXANDER
+%In addition, we gather all labels of all values created by the application. This allows us to detect if the web page gathers and compiles a fingerprint internally even if the fingerprint is not communicated over the network.
+%
+%By using the \fppattern we are matching the labels of all values created by the
+%application against \textit{known fingerprinting vectors}.
+%
+%There is nothing that prevents finding new fingerprinting vectors in this
+%approach, as fingerprinting libraries using new fingerprinting vectors would
+%(most likely) also use the old known fingerprinting vectors.
+%
+%However, since this collection
+%is relatively resource-intensive when done on actual web pages, we restrict the initial labeling to the \fppattern.
+%
+%This means that for this feasibility study, \name cannot find any new fingerprinting vectors.
+%
+The result of the label collection is two maps: one mapping network sinks to the accumulated label of exfiltrated values, and one mapping all script origins to
+the set of created labels. The maps allow us to analyze each web page
+for both internal creation of fingerprints where information is collected and combined, and fingerprinting, i.e.,
+ where the collected information is sent via a network sink. More precisely we can distinguish between the following uses:
+\begin{itemize}
+  \item Traditional use: information is gathered, composed, and sent (detected as both internal creation of fingerprints and fingerprinting)
+  \item Piece by piece: information is gathered and sent (detected as fingerprinting without internal creation of fingerprints)
+  \item Local use: information is gathered, composed, and used, but not sent (detected as internal creation of fingerprints without fingerprinting)
+  \item No fingerprinting: no information is composed, used, or sent (detected as neither internal creation of fingerprints nor fingerprinting)
+\end{itemize}
+
+
+First, to identify the presence of internal creation of fingerprints,
+we measure the maximum overlap of the created labels for each script with the baseline \fppattern.
+This gives us a good indication that a fingerprint is computed, since a large overlap of the 
+wide baseline \fppattern is unlikely for isolated scripts in a normal application.
+%
+Second, to identify the presence of fingerprinting, we compute the largest overlap of each identified
+network sink. While somewhat direct, this approach suffices given how fingerprint exfiltration is
+currently implemented. If the exfiltration becomes more sophisticated by, e.g., using different sinks,
+a more precise approach of handling the sinks will be required both to identify different sinks but
+also to differentiate between uses of the same sink. This would require gathering more information
+about the sink, such as names or IP addresses. While possible using our approach, it was not necessary
+for the experiment.
+
+%
+In addition to detecting the presence of fingerprinting, it is also interesting to
+try to identify the kind of fingerprinting that takes place. To this end, we use
+the per-flag extracted \fppatterns of \fpjs and \imprintjs. This gives us the possibility
+to characterize detected fingerprinting in terms of features and to identify
+common patterns using heatmaps.
+%
+We note this is not possible for \clientjs as it does not have the same
+customization as \fpjs and \imprintjs.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Design and Implementation}
+\label{sec:design}
+
+To perform measurements and detect fingerprinting we have created an
+information flow aware browser: \chromiumjsflow.
+%
+\chromiumjsflow is a modified version of Chromium that
+uses \jsflow~\cite{DBLP:journals/jcs/HedinBS15} to execute \JS by deploying 
+\jsflow as a library. By performing the injection inside Chromium, right before the
+script is sent to \veight for execution, we guarantee that all scripts, including
+dynamically injected scripts, are subject to the injection. 
+
+%instead of V8 to execute \JS. \jsflow is deployed
+%as a library~\cite{DBLP:conf/essos/MagaziniusHS14}, allowing \jsflow to execute all script content of a page.
+%The injection is done by trapping all scripts to be executed and
+%wrapping them in a call to the \jsflow execute function.
+%
+
+
+
+\subsection{Extending JSFlow}
+The current release of \jsflow supports \JSFlowEcma (ES5)~\cite{jsflow.net}
+along with the mandated standard runtime environment.
+%
+In order to use \jsflow to run actual web pages,
+\jsflow must be extended to support new features defined in
+ECMA-262 version 6~\cite{ecma-6} and later standards (ES6+).
+%
+In addition, \jsflow must also be extended to mediate between its own execution
+environment and the execution environment of the browser, as well as collecting the created and exfiltrated labels seen
+during page execution.
+
+\subsubsection{Extending \jsflow to ES6+}
+Initial attempts showed that a large portion of web pages use
+ES6+ features and, thus, do not
+run fully using an interpreter that only supports ES5.
+%
+Extending \jsflow with support for ES6+ is a large undertaking that would
+require both extending the core engine of \jsflow, as well as the
+standard libraries. This entails rewriting a large portion of \jsflow.
+As a middle ground, we opted for adding support
+for ES6+ in \jsflow by using a combination of transpiling and polyfilling.
+%
+Before any script is executed, \jsflow transpiles the code from ES6+
+to ES5 using Babel~\cite{babeljs}.
+%
+This will produce a new program that should be semantically
+equivalent to the original but only use ES5 features.
+%
+%% As an example, assume the following code which uses the arrow function
+%% (\texttt{=>}), introduced in ES6.
+%% %
+%% \begin{lstlisting}
+%%   [1,2,3].map(x => x + 1)
+%% \end{lstlisting}
+%% %
+%% Since the arrow function does not exist in ES5, Babel transpiles
+%% the above piece of code to the following.
+%% \begin{lstlisting}
+%%   [1,2,3].map(function (x) {
+%%     return x + 1;
+%%   })
+%% \end{lstlisting}
+%% The result contains only ES5 features and can be executed by \jsflow.
+%% %
+%
+In addition to transpiling, we use polyfills to provide the parts of the
+ES6 runtime that \jsflow does not implement. Before any code is executed \jsflow
+executes a runtime bundle containing all support libraries and polyfills needed
+for proper execution.
+%
+The runtime bundle extends the \jsflow runtime environment with polyfills from core-js~\cite{corejs} (for
+the ES6+ standard runtime),
+regenerator-runtime~\cite{regenerator-runtime} (needed by some
+of Babel's transformations), and window-crypto~\cite{window-crypto} (for the \texttt{Window.crypto} functionality).
+%
+
+\subsubsection{Connecting the Execution Environments}
+In order to use \jsflow to execute scripts in a browser environment,
+it is imperative to connect the \jsflow execution environment to
+the browser's \veight execution environment. 
+We implement the connection using a bidirectional and connected mediation between \veight values and the \jsflow counterparts, where
+ modifications done in either execution environment are reflected in the other. 
+ This effectively extends \jsflow
+ with the APIs provided by the browser and allows scripts to interact with the browser as if they are
+ running directly in V8.
+%
+%As an example, if a script registers an event handler by assigning a
+%function to a property, the assignment must be pushed from the \jsflow execution environment
+%to the \veight execution environment and
+%the \jsflow function must be mediated, since 
+%\jsflow functions are not \veight functions.
+%
+To implement the mediation, we scale the technique presented by Sj\"osten
+\etal~\cite{DBLP:conf/forte/SjostenHS18} to full \JS in
+the browser setting.
+
+\para{Masquerading \jsflow values as \veight values}
+%
+To mediate values from \jsflow to \veight the security labels
+must be removed: a process called \textit{unlabeling}.
+%
+For primitive values, unlabeling is the only mediation required since 
+\jsflow builds on the primitive values of \veight.
+%
+Mediating non-primitive values such as \texttt{Function}s or
+\texttt{Object}s requires recursive mediation of their parts.
+To retain the connection between the original \jsflow value and the
+\veight value we use Proxies~\cite{proxy-object}. The proxies allow
+ \jsflow objects to masquerade as \veight objects and perform recursive on-the-fly
+mediation on access, similar to that of the membrane pattern~\cite{miller2006robust}.
+
+
+\para{Masquerading \veight values as \jsflow values}
+%
+To mediate values from  \veight to \jsflow the security labels must be added: a process called
+\textit{relabeling}.
+%
+As above, for primitive values labeling is the only mediation required, while
+mediating non-primitive values such as \texttt{Function}s or
+\texttt{Object}s requires recursive mediation of their parts.
+%
+The recursive mediation is provided by wrapper objects that implement the \jsflow internal Ecma-object
+interface and perform recursive on-the-fly
+ mediation on access. The mediation follows a read-once-write-always semantics. That is,
+when a property is read, if it is defined on the host object, it is brought
+from the \veight execution environment, wrapped, and cached as an ordinary \jsflow property on the wrapper.
+Subsequent reads interact with the wrapper as an ordinary \jsflow object. When a property is written,
+it is written both unmediated to the wrapper as well as mediated to the host.
+
+
+\subsection{Label Models}
+The labeling and unlabeling of entities when mediating between \jsflow and \veight rely
+on label models which provide an abstract view of the computation of
+the mediated \veight values. In the experiments performed in this paper, we
+use a simple label model, that allows parts of
+the execution environment to be marked as sources or sinks. Reading from
+a source labels the value with the access path of the source and writing
+to a sink causes the label of the written value to be collected for analysis.
+%
+As an example, reading the \veight runtime property \texttt{navigator.userAgent}
+would label the resulting value with the label
+\texttt{<global.navigator.userAgent>},
+where \texttt{global} represents the global \texttt{window} object.
+%
+To compute the baseline \fppattern of the fingerprinting
+libraries, we use a model that labels every mediated part of the \veight API to
+record which parts of the API that are accessed by the libraries. 
+
+\para{Over and under labeling}
+%
+Observable \gls*{IFC} is in theory subject to both over and under labeling~\cite{DBLP:series/natosec/HedinS12}
+but performs well on the actual code currently found in the wild. 
+%
+With respect to this work, the label model described above risks under labeling, since it does not track
+flows that go via the extended environment. For instance,
+ writing a labeled
+value to the \gls*{DOM} would force unlabeling to occur, and the labels would be
+lost.
+%
+While this may be an issue for a more practical implementation, 
+providing such a model for the full execution environment of a browser
+is not within the scope of this work. We refer the reader to
+\cite{DBLP:conf/forte/SjostenHS18} for an insight into the complexity
+of creating such models.
+
+We encountered two examples of this issue in our practical experiments: 
+two of the analyzed pages used mediated versions of \texttt{btoa} to base-64
+encode the gathered information. This caused the labels to be lost before
+reaching the network sink. In those examples,
+we remedied the loss of precision by implementing
+\texttt{btoa}, but it points to the issue of losing labels when using functions that were automatically mediated
+from the \veight execution environment.
+%
+Although this is not an issue in our initial experiments,
+finding better-suited label models for standard API interaction that more
+precisely track flows of information via the mediated API functionality is an
+attractive goal for future explorations.
+
+
+
+\subsection{Extending Chromium}
+Modifying and maintaining modifications on a commercial product like Chromium
+requires a lot of work. The updates are frequent and the changes are often
+major, potentially requiring a lot of effort to cope with. For this reason, we pick Chromium 78.0.3904.70\footnote{This was the stable version when developing the patch.}
+and try to keep the modifications to a minimum.
+%
+
+To be able to inject \jsflow we focus the modifications to the point in Chromium where the
+script source code is transferred from the rendering engine Blink to V8 as a string for execution.
+There,  the following functionality was inserted.
+
+\begin{itemize}
+  \item If the intercepted script is the first script to execute in the context, then \jsflow is first injected followed by the injection of the \jsflow runtime containing polyfills and other supporting libraries.
+  \item When \jsflow has been injected the script is rewritten to contain a call to the main execution method of \jsflow passing the original source code as an argument.
+\end{itemize}
+%
+%% To exemplify the rewriting consider a page containing the following script:
+%% \begin{lstlisting}
+%%   <script>
+%%     console.log("Hello World!");
+%%   </script>
+%% \end{lstlisting}
+%% %
+%% As described above, the injection will wrap the entire script in a call to \jsflow. In this particular case, the
+%% result would become
+%% \begin{lstlisting}
+%%   <script>
+%%     jsflow.executeAndUnlabelResult(
+%%       "console.log(\"Hello World\");"
+%%     );
+%%   </script>
+%% \end{lstlisting}
+%
+The injection works in the same way for inline scripts, scripts fetched via a URL, or retrieved by other means.
+At the point of injection, Chromium has already extracted the script source into a string.
+This way, all scripts on a page are executed via \jsflow regardless of if they originate
+from an inline script tag, a script tag using a URL, or an event handler.
+
+\subsection{Protecting \jsflow}
+Scripts have the capability of modifying the \veight execution
+environment by, e.g., overwriting standard library implementations.
+%
+Since \jsflow itself runs in the same \veight execution environment as
+a web page and is mediating to and from the execution environment,
+there is a need to protect the integrity of \jsflow.
+%
+Further, \jsflow is implemented by using (parts of) the standard
+ES6+ execution environment, so modifications by scripts may
+unintentionally break \jsflow in the presence of uncontrolled mediation.
+%
+To defend against this, \jsflow must run the scripts defensively to
+protect key parts of the environment from being affected by script execution.
+%
+To this end, the standard execution environment of \jsflow does not perform any
+mediation, meaning scripts are unable to modify parts of the \veight
+execution environment also implemented by \jsflow.
+%
+The parts of the \veight execution environment not implemented in
+the \jsflow execution environment are all mediated via the \jsflow
+global window object.
+%
+This object is a hybrid between a \jsflow global object and a wrapper,
+providing protection from tampering by hiding sensitive parts of the
+execution environment.
+%
+The parts of the execution environment that are either defined by
+\jsflow via this global window object or that are part of the hidden
+environment will not be mediated, with the hidden environment being implemented by polyfills.
+%
+The remaining, mediated part of the global object follows the read-once-write-always mediation provided by
+the \jsflow wrappers.
+
+
+%% ADD text on over and undertainting
+\subsection{Collecting Labels}
+Every value that is going through \jsflow is given a label by the label model, and
+when two values are combined, the corresponding label is computed as the
+least upper bound of the labels.
+%
+In our setting, since labels are the access paths of the information used to create the values, the least upper bound
+corresponds to the union of the paths.
+%
+Take, for example, the following code snippet.
+\begin{lstlisting}
+  let a = navigator.userAgent;
+  let b = navigator.language;
+  let c = a + ' ' + b;
+\end{lstlisting}
+The value \texttt{a} will be labeled \texttt{<navigator.userAgent>}
+and the value \texttt{b} will be labeled \texttt{<navigator.language>}.
+%
+As the value \texttt{c} is the aggregation of values \texttt{a}
+and \texttt{b} it will be labeled with both sources
+forming the label \texttt{<navigator.userAgent, navigator.language>}.
+%
+
+In order to analyze the aggregated labels, \jsflow was extended with the
+ability to store the labels seen during execution on a script basis.
+%
+In practice this is done on label creation; whenever the least upper bound is computed in \jsflow,
+the computed label will be stored internally in a map that maps script origins to label sets. This allows us to
+detect whether any values that may correspond to a fingerprint were created by the script.
+%
+In addition, in order to be able to detect fingerprinting, we are interested
+in the flow from the \fppattern to the network sinks. To track this
+we also store an accumulated label per API endpoint. Every time a \jsflow value
+is unlabeled to be passed into the \veight runtime (by an assignment or function call),
+we add the removed label to a map that maps API endpoints to labels.
+%
+During the execution of a page, \jsflow regularly writes the accumulated labels
+via a function on the global object if such a function exists.
+This way automated tools, like crawlers, are able to collect labels from \jsflow
+by providing the extraction function. In our case, we use a Puppeteer-based~\cite{puppeteer} crawler
+that stores the collected labels to disk for later analysis.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Empirical Study}
+\label{sec:study}
+In order to validate our approach, we have conducted an empirical study by
+crawling web pages belonging to one of two different categories:
+non-fingerprinting and fingerprinting web pages.
+The fingerprinting web pages are divided into three classes:
+\begin{itemize}
+  \item (bot detection) web pages that perform bot detection,
+  \item (authentication) web pages that use some form of fingerprinting as part of their authentication process, and
+  \item (alexa) web pages in Alexa top 100,000 that perform fingerprinting that is not part of bot detection or authentication.
+\end{itemize}
+%
+
+A total of 30 web pages were selected: 20 fingerprinting and 10 non-fingerprinting.
+Of the 20 fingerprinting pages, 5 are in the bot detection class, 5 in the authentication class,
+and 10 in the alexa class.
+%
+Depending on the category and class different rationals were used in the selection.
+
+\para{Non-fingerprinting}
+%
+To find pages in the non-fingerprinting category that contain interesting behavior
+such as  analytic scripts, polyfills, or ads the following method was used. First, 
+an initial selection of pages with potentially interesting behavior was created based
+on popularity and type of content. The assumption was that popularity is the result of a conscious 
+effort and that popular pages are likely to contain both analytic scripts, polyfills 
+(to reach a wide audience), and ads. In this category, we find, e.g., major news outlets.
+%
+Second, we used the Brave browser to filter the selection based on the presence 
+of tracking and analytic scripts as well as ads. The process was manual and based on visiting
+the pages using Brave while discarding all pages that Brave did not classify as containing scripts
+in either of those categories.
+%
+For the pages indicated to contain interesting scripts, we further verified that 
+the scripts were used by (and not only present in) the web pages by verifying that the scripts were executed when
+visiting the pages with script blocking turned off.
+%
+Third, to ensure the web pages were free from fingerprinting the method to find
+fingerprinting pages described below was used in addition to the information
+given by Brave.
+
+\para{Authentication}
+%
+%Since fingerprinting can be used to identify and track users it can also be
+%used at authentication points to protect against, e.g., account hijacking.
+To find pages that incorporate fingerprinting in their authentication process the following method was used. 
+First, an initial selection of major bank pages was created based on the assumption that banks both include authentication
+and have a vested interest in protecting their users. 
+%
+Second, the selection was filtered by searching for the presence of known fingerprinting sources such as 
+calls to \texttt{toDataURL} or calls to \texttt{navigator.plugins} by analyzing the scripts as strings while parsed in \veight.
+%
+%of known fingerprinting libraries by using the following heuristics that looks
+%for three syntactic features:
+%
+%\begin{enumerate}
+%\item calls to \texttt{toDataURL}, which can be used for canvas
+%fingerprinting,
+%\item the known pangrams used as part of well-known canvas fingerprinting techniques,
+%\texttt{``How quickly daft jumping zebras vex.''},
+%\texttt{``Cwm fjordbank glyphs vext quiz''}, and\\
+%\texttt{``abcdefghijklmnopqrstuvwxyz''}, and
+%\item calls to \texttt{navigator.plugins}.
+%\end{enumerate}
+%
+Third, for the remaining candidates, we manually analyzed the scripts of the
+page by visiting the page with the debugger active to identify pages that used fingerprinting
+as part of the authentication process.
+%
+In this step, we set breakpoints to ensure the scripts containing the potential fingerprinting were indeed executed and not only loaded.
+
+%While this approach carries the risk of skewing the selection of pages to pages that
+%contain or perform canvas fingerprinting this is a risk we cannot avoid without already having
+%a way to solve the problem the paper addresses. Further, canvas fingerprinting is an important source
+%of entropy and a frequently used technique on pages that use fingerprinting to improve
+%security, which makes the approach more suitable for this category of pages.
+
+\para{Bot detection}
+%
+To find pages that contain bot-detection the following method was used. First,
+a collection of candidate pages was created based on known customers of
+bot protection, booking pages, and pages mentioned by Jonker \etal in their
+paper on the detection of bot detection~\cite{DBLP:conf/esorics/JonkerKV19}.
+%
+Second, the candidate pages were filtered using a specialized
+crawler that visits web pages, waits for 30 seconds, and
+then takes a screenshot.
+%
+If the collected screenshot showed a (re)CAPTCHA or that access was denied, the
+web page was deemed to perform bot detection.
+%
+Third, the remaining pages were manually analyzed by visiting the page with the debugger active, again setting breakpoints to ensure suspicious scripts were executed,
+retaining the pages that used fingerprinting as part of the bot-detection process.
+
+
+
+%The use of bots for, e.g., scraping prices from online stores and
+%ticket shops is common, which has prompted web pages to try and detect
+%these bots.
+%
+%There are several companies that offer protection against bots, such
+%as DataDome~\cite{datadome}, PerimeterX~\cite{perimeterx}, and Imperva
+%(previously Distil Networks)~\cite{imperva}.
+%
+
+%
+%First, companies that offer bot detection often mention some
+%pages that use their services. Similarly, there are web pages that show featured customers for different companies~\cite{featuredcustomers}.
+%We included a selection of promoted pages as candidates.
+%
+%Second, bot detection is often used on booking pages. For this reason,
+%we collected a list of large airline companies and included them as candidates.
+%
+%Third, we included the web pages  as
+%candidates.
+%
+
+
+\para{Alexa}
+%
+To find web pages that perform fingerprinting which do not
+match any of the previous categories, we used two different
+approaches.
+%
+First, we used information from a crawl of Alexa top 100,000 performed
+with OpenWPM, which recorded blocked
+fingerprinting resources based on the Disconnect
+list~\cite{disconnect}.
+%
+We also visited pages in the Alexa top 1,000 and did the same analysis
+as for authentication pages.
+%
+Based on these results, we visited a random set of web pages which had
+fingerprinting resources and ensured these resources were executed.
+
+\subsection{Experiment Setup}
+%
+To visit the different web pages, we used a crawler implemented with
+Puppeteer~\cite{puppeteer} to control \chromiumjsflow.
+%
+In order to decrease the overhead of collecting the labels, we only
+collected labels that were part of the baseline \fppattern.
+%
+Using the baseline, each of the selected pages was visited by the crawler
+for up to 12 hours. This is to ensure that the fingerprinting script was not prevented
+from running due to \jsflow performance issues. As an example, fingerprinting scripts usually compound the values into a hash, and executing \fpjs alone with all flags active would take around 45 minutes with \jsflow.
+These performance issues come from \jsflow being an information-flow aware
+deep-embedding of \JSFlowEcma. When executing, \jsflow performs every execution step mandated by \JSFlowEcma
+without any optimization. The execution speed of \jsflow does not reflect on the feasibility of 
+using dynamic \gls*{IFC} but it limits the number of pages that can be analyzed with the current setup. Indeed, 
+only around 5\% of the execution time is spent on handling the security labels.
+
+
+\subsection{API Endpoints}
+
+\begin{figure*}[ht]
+  \centering
+  \input{tikzplots/all_created_escaping_escapingnw_by_domain.tikz}
+  \vspace{-7mm}
+  \caption{Breakdown of the maximum overlap for a script for each web page
+    against the baseline \fppattern consisting of the libraries \fpjs,
+    \imprintjs, and \clientjs. \textit{Internal} labels are features accessed by the web page code, and \textit{Exfiltrated} are labels reaching a network sink. The web pages are sorted based on the exfiltrated
+    label within the two categories (Non-fingerprinting and Fingerprinting). The
+    y-axis is the percentage overlap for a web page with the baseline
+    \fppattern. The dashed red line is the lowest Fingerprinting overlap.}
+  \label{fig:all_category}
+\end{figure*}
+
+Each of the selected web pages was visited while
+recording created and exfiltrated labels from the baseline \fppattern.
+For each page and each API endpoint, every label reaching the endpoint was collected
+in addition to collecting all created labels for each page
+and script. This allows us to infer what parts of the \fppattern did flow to
+network sinks as well as if the application accumulated fingerprinting information internally.
+
+%
+
+To define potential network sinks we analyzed the used API endpoints to
+identify uses that could trigger a
+network or storage request (which would or could be used to send the
+information later).
+%
+For this experiment, the identified network sinks were:
+\begin{itemize}
+  \item \texttt{navigator.sendBeacon}
+  \item \texttt{XMLHttpRequest}
+  \item \texttt{fetch}
+  \item \texttt{window.postMessage}
+  \item setting \texttt{src} attributes of HTML elements such as images and scripts
+  \item setting attributes on \texttt{HTMLFormElement}
+  \item \texttt{document.cookie}
+\end{itemize}
+
+\subsection{Analysis}
+
+The complete overlap for the sinks against the baseline \fppattern for each web page can be
+found in \Cref{fig:all_category} and the exfiltration method for each web page can be seen in
+\Cref{tab:sinks}.
+
+\begin{table*}[ht]
+  \centering
+  \caption{Table showing the sinks used by the scripts on the domains to
+    exfiltrate the maximum overlap of (potential) fingerprint value. Only sinks
+    that can be used to send data (e.g. \texttt{document.cookie}, network
+    requests, etc.) is shown. The entries are sorted by the two categories.}
+  %\resizebox{\columnwidth}{!}{
+    \begin{tabular}{ l | l | l  }
+      Domain & Class & Sink \\
+      \hline
+      %%% Non-fingerprinting
+      \alexa  & --- & \texttt{Image.src} \\
+      \dailymail & --- & \texttt{document.querySelectorAll.src} \\
+      \ebay & --- & \texttt{HTMLFormElement.setAttribute} \\
+      \gamespot & --- & \texttt{document.cookie} \\
+      \microsoft & --- & \texttt{navigator.sendBeacon} \\
+      \stackoverflow  & --- & \texttt{navigator.sendBeacon} \\
+      \theguardian & --- & \texttt{Image.src} \\
+      \washingtonpost  & --- & \texttt{navigator.sendBeacon} \\
+      \wired & --- & \texttt{document.createElement.src} \\
+      \zoom  & --- & \texttt{HTMLFormElement.setAttribute} \\
+      \hline
+      \aktuality & Alexa list & \texttt{document.createElement.src}, \texttt{XMLHttpRequest.open} \\  %%% Alexa list
+      \cit  & Authentication & \texttt{HTMLFormElement.setAttribute} \\  %%% Authentication
+      \citibank  & Authentication & \texttt{XMLHttpRequest.send} \\  %%% Authentication
+      \creditsuisse & Authentication & \texttt{HTMLFormElement.appendChild} \\  %%% Authentication
+      \frankmotorsinc & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+      \jd & Alexa list & \texttt{XMLHttpRequest.send} \\  %%% Alexa list
+      \kinoprofi & Alexa list & \texttt{HTMLFormElement.setAttribute} \\  %%% Alexa list
+      \lgcom & Alexa list & \texttt{HTMLFormElement.setAttribute} \\  %%% Alexa list
+      \lufthansa & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+      \olx & Alexa list & \texttt{document.cookie} \\  %%% Alexa list
+      \pnc & Authentication & \texttt{document.createElement.src} \\  %%% Authentication
+      \rei & Alexa list & \texttt{document.cookie} \\  %%% Alexa list
+      \rezka & Alexa list & \texttt{HTMLFormElement.setAttribute} \\  %%% Alexa list    
+      \santanderbank & Authentication & \texttt{XMLHttpRequest.send} \\  %%% Authentication
+      \sciencedirect & Alexa list & \texttt{document.cookie} \\  %%% Alexa list    
+      \scribd & Alexa list & \texttt{document.createElement.src} \\  %%% Alexa list
+      \samsonite & Bot detection & \texttt{HTMLFormElement.setAttribute} \\  %%% Bot detection
+      \stubhub & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+      \ultimateguitar & Alexa list & \texttt{document.createElement.src}, \texttt{navigator.sendBeacon} \\  %%% Alexa list
+      \whitepages  & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+    \end{tabular}
+  %}
+  \label{tab:sinks}
+\end{table*}
+
+A key takeaway is that our results confirm our intuition: pages
+that access a wide surface of sensitive APIs and send consolidated information to the network
+represent the essence of fingerprinting and
+are clearly marked as such by their high overlaps with the baseline.
+%
+%%% Very popular to send the result to an external server
+Further, the majority of the visited web pages send sensitive information via network sinks,
+as can be seen in \Cref{tab:sinks}.
+%
+This is an indication that (partial) compounded data is being sent to an
+external server. As expected, this occurs on pages belonging to both categories.
+The difference is the amount of sensitive information being transmitted. This
+is a strong indicator that it does not suffice to look at the \fppattern of the
+application and whether the application uses the network or not. To detect
+fingerprinting we must track what information reaches the network sink.
+
+%%% Piece by piece fingerprinting is not common
+We can also see that the majority of the web pages have
+close to equivalent internal fingerprints and labels that reach the network sink.
+Although our experiments over-approximate the labels reaching the network sink as the labels are compounded based on the API used and not the source of the request, it still indicates that
+current fingerprinting scripts accumulate and compute a fingerprint before
+transmitting it.
+%
+As we do not see a much smaller overlap of internal labels we see no evidence of piece by piece fingerprinting, where the
+fingerprint is being sent gradually to an external server.
+%
+This indicates it may be enough to only look at the internally created
+fingerprints, but a larger study must be conducted to evaluate this.
+%
+
+The only potential local use of the fingerprint is
+\creditsuisse, as we can see a large drop between the overlap of the largest
+internally created label and the exfiltrated label.
+%
+After manually analyzing the source code of \creditsuisse it is clear the
+largest internal label comes from performing fingerprinting, which writes the
+result to a global variable called \texttt{fp2murmur}.
+%
+This global variable is never used, which may indicate the result from
+that specific fingerprinting method is not used.
+%
+However, we could also see that several fingerprinting attributes are
+being written gradually to a form element, which is the
+\creditsuisseEscapeNetworkPercentage overlap which can be seen in
+\Cref{fig:all_category}.
+
+%%% Discuss the different categories
+When looking at the two categories, we can see there is a potential cut-off that
+allows us to distinguish between non-fingerprinting and fingerprinting.
+%
+A larger than 20\% overlap with the full baseline indicates the presence of
+fingerprinting.
+%
+Indeed, the \textit{maximum} matching overlap for the non-fingerprinting
+category came from \dailymail, with an overlap of
+\dailymailEscapeNetworkPercentage.
+%
+This can be compared to the \textit{minimum} matching overlap for the
+fingerprinting category, namely \ultimateguitar\xspace with
+\ultimateguitarEscapeNetworkPercentage.
+
+%%% Discuss the different classes within fingerprinting
+When looking at the individual classes in the fingerprinting category, the
+situation is more subtle.
+%
+Pages within the authentication class have an overlap with the full baseline of
+between \citibankEscapeNetworkPercentage and \pncEscapeNetworkPercentage, and
+the bot detection class has an overlap between \samsoniteEscapeNetworkPercentage
+and \whitepagesEscapeNetworkPercentage, compared to the alexa class which has
+five pages at or above \rezkaEscapeNetworkPercentage.
+%
+This is not surprising since authentication and bot detection may have different
+goals compared to the fingerprinting in the alexa class.
+
+We note that the overlap of the bot detection pages may have been higher if we
+tried to hide the fact we are a crawler by using stealth libraries for Puppeteer
+(e.g. puppeteer-extra-plugin-stealth~\cite{puppeteer-extra-plugin-stealth}).
+%
+We decided against using a stealth library as this can make properties used for
+fingerprinting non-accessible and with that, the amount of fingerprinting
+information is less.
+
+%%% Discuss exfiltration method
+Aside from the pages in the alexa class of the fingerprinting category using
+\texttt{document.cookie} as the exfiltration method (only one non-fingerprinting
+web page used it), there is no real distinction between the exfiltration methods
+between the two categories.
+
+%%% Discuss the heatmaps
+To further analyze the two categories, we have created heatmaps
+for the different features of \fpjs and \imprintjs. The heatmaps for the two categories are found in
+\Cref{fig:heatmaps} for \fpjs and in \Cref{app:heatmaps_categories_imprintjs} for \imprintjs.
+%
+As \imprintjs is not as updated as \fpjs there are some keys not found on web
+pages as they refer to outdated API calls.
+%
+However, the heatmaps for \imprintjs entail the same story as \fpjs and we will
+therefore focus on \fpjs in this section.
+%
+
+When generating the heatmaps, we took the labels from the highest overlap with the baseline \fppattern for each web page (i.e., the same overlap as in \Cref{fig:all_category}).
+%
+This set of labels is then cross-referenced against what labels each feature of the fingerprinting libraries would produce, to discover which keys could have been used when generating the set of labels.
+%
+Each row in the heatmaps shows the conditional probabilities of the features of
+each column given the feature of the row. The probabilities are interpreted as a gradient
+between yellow (0\% probability) and red (100\% probability). Thus,
+the diagonal shows which features were used for the largest overlaps by the pages in the category.
+%
+
+Looking at the heatmaps we can see that pages from the non-fingerprinting
+category (\Cref{fig:non-fp-heatmap}) are not that intrusive when it comes to data
+collection compared to the fingerprinting category (\Cref{fig:fp-heatmap}).
+%
+One could argue non-fingerprinting web pages should have no overlap with the baseline \fppattern, but we can see in \Cref{fig:non-fp-heatmap} that the collected features are mainly screen information and general browser information.
+%
+Although these features are also used by fingerprinting web pages, more features are usually used when conducting fingerprinting.
+
+We have also added heatmaps for each class in the fingerprinting category in
+\Cref{app:heatmaps_fpjs} for \fpjs and \Cref{app:heatmaps_classes_imprintjs} for
+\imprintjs.
+%
+These heatmaps show an increased intensity in the use of fingerprinting features
+from the authentication class and the bot
+detection class.
+%
+The alexa class clearly shows that the more
+general, traditional fingerprinting is the most intrusive with many fingerprinting
+features being used.
+%
+This supports the success in detecting fingerprinting by looking at the overlap
+between the baseline \fppattern and the exfiltrated information.
+%
+
+
+When looking at the heatmap for the fingerprinting category for \fpjs, we can see the use
+of \texttt{enumerateDevices}, which probes the list of all available media input
+and output devices.
+%
+Interestingly enough, this almost exclusively comes from the bot detection class.
+%
+It is worth pointing out that \texttt{enumerateDevices} is disabled by default
+in \fpjs, which may explain why it is not used in the alexa class.
+%
+Similarly, the \texttt{webdriver} feature, which checks for the property
+\texttt{navigator.webdriver}, is overrepresented in the bot detection class.
+%
+Although it can be faked, this property indicates if the user agent is
+controlled by an automatic tool such as Puppeteer or Selenium, making it an easy
+check to detect potential bots, given that they are not trying to hide their presence.
+
+
+\begin{figure*}[t!]
+  \centering
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Non-fingerprinting}
+    \label{fig:non-fp-heatmap}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.9]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 29.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 29.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/non_fp_fpjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \vspace{8em}
+  \end{subfigure}
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Fingerprinting}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.9]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 29.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 29.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/fp_fpjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:fp-heatmap}
+  \end{subfigure}
+  \vspace{6em}
+  \caption{Heatmaps for the two categories when compared against \fpjs. For each row, the column identifies
+  the conditional probability of the feature of the column given the feature of the row. The probability is interpreted as a gradient
+  between yellow (0\% probability) and red (100\% probability).}
+  \label{fig:heatmaps}
+\end{figure*}
+
+%% \subsection{Remarks on performance}
+%% %\todo{Andrei}{This part is not so much for boasting :) but if we don't mention it, the reviewers will! For example,
+%% %Is there a way to relate the overhead of label manipulation with the same setup but without lavel tracking?}
+
+%% \jsflow is an information flow aware \JS interpreter written in \JS.
+%% The main goal of \jsflow is to provide a platform for experimentation with
+%% various forms of dynamic \gls*{IFC} in a \JS setting and as such is not written
+%% with performance in mind. On the contrary, in order to ensure correct behavior
+%% \jsflow follows the \JSFlowEcma standard very closely. Naturally, if one compares
+%% \jsflow executing a script on top of \veight to the script running natively in \veight
+%% the performance difference is significant.
+
+%% A more interesting question is how large portion of the execution time is due to information
+%% flow tracking. While this is not entirely easy to measure, since there is no way to turn off
+%% information flow tracking in \jsflow, most of the tracking passes through a limited
+%% number of functions (e.g., for joining and comparing labels). Profiling those functions indicates that
+%% the labeling incurs a runtime cost of around 5\% on the \fpjs page used to create the baseline \fppattern.
+
+%% While the 5\% overhead might be a reasonable starting point for optimizing a  \veight-based implementation, this direction is outside the scope of our work. Instead,
+%% we have focused on a proof of concept that demonstrates that observable tracking can
+%% be leveraged to effectively track fingerprinting patterns. As such,
+%% \name{} provides a rich platform for experiments and security testing of  real-world web pages with dynamic IFC.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Discussion}
+\label{sec:discussion}
+While our initial experiments show that it is possible to detect fingerprinting
+by tracking how information flows from a baseline \fppattern to network sinks,
+our work opens up a few interesting avenues of future work.
+
+
+
+\subsection{Fingerprinting Metrics}
+\label{sec:fp-metrics}
+
+
+Our solution compares the overlap between the baseline \fppattern
+and the script \pattern to detect fingerprinting. The results show that
+this approach is already effective. For the pages that make up our empirical study,
+it is possible to use this to perform a precise classification
+without false positives or false negatives. For a more extensive study, however, 
+more precise metrics are likely to be needed.
+%
+For instance, a source of potential false negatives would be web pages which only use a
+specific fingerprinting method, such as canvas fingerprinting. In the experiments, 
+we manually verified each of the non-fingerprinting web pages to ensure this was
+not the case, but for these situations, another fingerprinting metric may be more suitable.
+
+\para{Weighted overlap}
+%
+The unweighted overlap used in this paper does not distinguish
+between common and uncommon features.
+%
+For example, the API pattern of canvas fingerprinting is implicitly
+assigned the same importance as the API pattern of querying the user
+agent or the screen width of the browser, while the canvas fingerprinting
+is arguably more indicative of fingerprinting than probing the user agent or
+screen width.
+%
+Instead of implicitly giving all features the same importance weighted overlap assigns weights to each source and compares
+the weighted sum.
+%
+One interesting starting point to the challenge of deciding on the relative weights could be to
+use the entropy reported by
+Panopticlick~\cite{panopticlick} to generate the weights for each API
+pattern in the fingerprinting library.
+
+\para{Conditional overlap}
+%
+The weighted overlap assigns more importance to features that are more indicative
+of fingerprinting, but does not take that some combinations of
+features may be rarer than others, as indicated by our heatmaps, into account.
+ Thus, such combinations should probably be given more weight than the sum of their parts.
+ The conditional probability computed to generate the heatmaps could be a good
+ starting point for finding clusters that identify the various categories.
+
+
+\subsection{Further Aid Anti-Fingerprinting}
+\label{sec:anti-fp-aid}
+%
+If a more effective version of \name{} is implemented directly into \veight, which
+is a huge undertaking due to \veight being a fast-moving target, there are two
+natural uses.
+%
+On the one hand, it could be used to help generate filter lists that help users block unwanted content.
+%
+This could remove the currently heavy manual burden of creating and maintaining
+these filter lists.
+%
+On the other hand, it could be used to collect more labels than just the
+\fppattern, and with that find new potential fingerprinting vectors when they
+arise.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Related Work}
+\label{sec:related-work}
+
+Much work has been done, regarding both conducting and combating
+device fingerprinting.
+%
+This section aims to provide an overview of combating fingerprinting.
+%
+For a full description, we refer the reader to a timely survey by
+Laperdrix \etal~\cite{DBLP:journals/tweb/LaperdrixBBA20}.
+
+Englehardt and Narayanan developed
+OpenWPM~\cite{openwpm-github,DBLP:conf/ccs/EnglehardtN16}, a web
+privacy measurement framework.
+%
+OpenWPM instruments the access to the \JS API and links every access
+to the corresponding script.
+%
+This is then stored for offline analysis, and Englehardt and Narayanan
+found new fingerprinting vectors by crawling with OpenWPM on the Alexa
+top 1,000,000.
+%
+However, different from OpenWPM, \name{} does not implicitly assume that
+access equates to exfiltration and can instead focus purely on the flows
+that reach potential network sinks.
+
+A promising approach to help detect browser fingerprinting is machine
+learning.
+%
+Iqbal \etal presented
+\textsc{FP-Inspector}~\cite{FingerprintingFingerprinters} and
+detected fingerprinting with a 99.9\% accuracy and 26\% more
+fingerprinting scripts than manually designed heuristics.
+%
+Rizzo \etal combine analysis of \JS code with machine learning to detect web
+fingerprinters~\cite{pets2021-rizzo}, achieving 94\% accuracy and finding more
+than 840 fingerprinting services, 695 of which were unknown to popular tracker
+blockers.
+%
+By taking advantage that fingerprinting scripts have similar
+\apatterns, Bird \etal presented a semi-supervised machine learning
+approach to detect
+fingerprinting~\cite{DBLP:journals/corr/abs-2003-04463}, identifying
+\(\geq\)94.9\% of resources that current heuristic techniques
+identified.
+%
+This is an approach that can be combined with \name{} and potentially
+strengthen the approach by only focusing on observable values that
+reach a network sink.
+
+
+Another approach is to use browser extensions to randomize, e.g., the
+user agent, but as Nikiforakis \etal
+showed~\cite{DBLP:conf/sp/NikiforakisKJKPV13}, this can create
+inconsistencies between the user agent and other publicly available
+APIs (e.g. \texttt{navigator.platform}).
+%
+Vastel \etal developed
+\textsc{FP-Scanner}~\cite{DBLP:conf/uss/VastelLRR18}, a test-suite
+that explores browser fingerprint inconsistencies to detect potential
+alterations done by fingerprinting countermeasures tools.
+%
+\textsc{FP-Scanner} could not only find these inconsistencies but also
+reveal the original values, which in turn could be exploited by
+fingerprinters to more accurately target browsers with fingerprinting
+countermeasures.
+
+Both Laperdrix \etal~\cite{DBLP:conf/icse/LaperdrixRB15} and
+G{\'{o}}mez{-}Boix \etal~\cite{DBLP:conf/ccs/Gomez-BoixFBB19} proposed
+virtualization and modular architectures to randomly assemble a
+coherent set of components whenever a user wanted to browse the web.
+%
+This would break the linkability of fingerprints between sessions
+while not having any inconsistencies between attributes, but the user
+comfort may go down.
+
+Besson \etal formalized a privacy enforcement based on a randomization
+defense using quantitative
+information-flow~\cite{DBLP:conf/nordsec/BessonBJ14}.
+%
+They synthesize a randomization mechanism that defines the
+configurations for each user and found that more efficient privacy
+enforcement often leads to lower usability, i.e., users have to switch
+to other configurations often.
+%
+Jang \etal used a rewriting-based \gls*{IFC} approach to detect four
+privacy-violating flows in web applications: cookie stealing, location
+hijacking, history sniffing, and behavior tracking, finding 46 cases
+of history sniffing in the Alexa top
+50,000~\cite{DBLP:conf/ccs/JangJLS10}.
+%
+Ferreira Torres \etal~\cite{DBLP:conf/esorics/TorresJM15} proposed
+generating unique fingerprints to be used on each visited web page,
+making it more difficult for third parties to track the same user over
+multiple web pages.
+%
+FaizKhademi \etal~\cite{DBLP:conf/dbsec/FaizKhademiZW15} proposed the
+detection of fingerprinting by monitoring and recording the activities
+by a web page from the time it started loading.
+%
+Based on the recording, they were able to extract metrics related to
+fingerprinting methods to build a signature of the web page to
+distinguish normal web pages from fingerprinting web pages.
+%
+If the web page is deemed to be fingerprinting, the access to the
+browser is limited e.g. by limiting the number of fonts allowed to be
+enumerated, by adding randomness to attribute values of the
+\texttt{navigator} and \texttt{screen} objects, and noise to canvas
+images that are generated.
+
+Nikiforakis \etal~\cite{DBLP:conf/www/NikiforakisJL15} proposed using
+randomization policies, which are protection strategies that can be
+activated when certain criteria are met.
+%
+Similarly, Laperdrix \etal~\cite{DBLP:conf/essos/LaperdrixBM17}
+proposed adding randomness to some more complex parts of the \gls*{DOM}
+API: canvas, web audio API, and the order of \JS object properties.
+
+Browser vendors are also implementing anti-fingerprinting measures.
+%
+Brave~\cite{brave-anti-fp} added randomness to mitigate canvas,
+WebGL, and AudioContext fingerprinting, adding to their already
+implemented fingerprinting
+protections~\cite{brave-fingerprinting-protections}.
+%
+Firefox introduced Enhanced Tracking
+Protection~\cite{firefox-enhanced-tracking-protection}, which would
+allow third-party cookies to be blocked.
+%
+This has later been expanded to also block all third-party requests to
+companies that are known to participate in
+fingerprinting~\cite{firefox-anti-fp}; a feature that is also found in Microsoft
+Edge~\cite{edge-anti-fp}.
+%
+Safari applies similar restrictions on cookies as Firefox, and also
+presents a simplified version of the system configuration to trackers,
+making more devices look identical~\cite{safari-anti-fp}.
+%
+The Tor browser aims to make all users look identical to resist
+fingerprinting~\cite{tor-anti-fp}.
+%
+Unfortunately, this means that as soon as a user maximizes the browser
+window or installs a plugin, their fingerprint will divert from the
+unified Tor browser fingerprint~\cite{tor-fp-problem}.
+%
+Similarly, as all Tor browsers aim to look identical, Khattak \etal
+showed they can be a target for blocking, showing 3.67\% of the Alexa
+top 1,000 pages blocked access to Tor
+users~\cite{DBLP:conf/ndss/KhattakFAJSMPM16}.
+%
+Lastly, of the well-known browser vendors, Chrome has announced ``The
+Privacy Sandbox''~\cite{chrome-privacy-sandbox}, where they are
+planning to combat fingerprinting by implementing a privacy
+budget~\cite{chrome-anti-fp}.
+
+
+%% Much work has been done, regarding both conducting and combating
+%% device fingerprinting.
+%% %
+%% This section aims to provide an overview of both categories.
+%% %
+%% For a full description, we refer the reader to a timely survey by
+%% Laperdrix \etal~\cite{DBLP:journals/tweb/LaperdrixBBA20}.
+%
+
+%% \para{Browser fingerprinting}
+%% While device fingerprinting has been a known problem for a long time,
+%% Mayer noticed a browser could present ``quirkiness'' which originated
+%% from the operating system, the hardware, and the browser
+%% configuration~\cite{mayer2009any}.
+%% %
+%% He showed that 96.23\% of 1,328 users could be uniquely identified just by
+%% looking at the \texttt{navigator} object, \texttt{screen} object,
+%% \texttt{navigator.plugins}, and \texttt{navigator.mimeTypes}.
+%% %
+%% Eckersley was the first to present how browser fingerprinting
+%% could be effective by querying for standard browser features in a
+%% large-scale study~\cite{DBLP:conf/pet/Eckersley10}, showing 83.6\% of
+%% the 470,161 fingerprints were unique.
+%% %
+%% This number rose to 94.2\% if Flash or Java were enabled.
+%% %
+%% However, a more recent study by G{\'{o}}mez{-}Boix
+%% \etal~\cite{DBLP:conf/www/Gomez-BoixLB18} showed the amount of
+%% uniquely identifiable users have gone down, but that a non-unique
+%% fingerprint is probable to become unique if some features change.
+%% %
+%% Since the study of Eckersley, new technology has been added to the
+%% browser, and with that new ways of fingerprinting browsers have
+%% emerged.
+%% %
+%% Mowery and Shacham showed how the HTML5 canvas feature and the WebGL
+%% graphics API could be used to generate stable
+%% fingerprints~\cite{Mowery2012PixelP}.
+%% %
+%% Cao \etal designed a fingerprinting technique that relied on WebGL,
+%% uniquely identifying 99.24\% of the 1,903 tested
+%% devices~\cite{DBLP:conf/ndss/CaoLW17}.
+%% %
+%% Mulazanni \etal showed how differences in the \JS execution engine
+%% could be used to fingerprint users based on a test suite on the \ES
+%% standard~\cite{mulazzani2013fast}, and Nikiforakis
+%% \etal~\cite{DBLP:conf/sp/NikiforakisKJKPV13} showed differences in the
+%% \texttt{navigator} and \texttt{screen} objects can distinguish between
+%% different browser families, as well as major and minor versions within
+%% the same family.
+%% %
+%% Sanchez-Rola \etal exploited API functions in the HTML Cryptography
+%% API in Chromium which, when called, will invoke native functions,
+%% allowing to time the internal clock signals of the
+%% CPU~\cite{DBLP:conf/ccs/Sanchez-RolaSB18}.
+%% %
+%% Although fingerprinting is privacy-intrusive, research has been made
+%% on how it can strengthen security.
+%% %
+%% Alaca and van Oorschot~\cite{DBLP:conf/acsac/AlacaO16} explored device
+%% fingerprinting for augmenting authentication, Laperdrix \etal proposed
+%% the use of canvas fingerprinting to strengthen web authentication via
+%% a challenge-response mechanism~\cite{DBLP:conf/dimva/LaperdrixABN19}, and
+%% Andriamilanto \etal proposed FPSelect, a framework for attribute selection to
+%% tune browser fingerprinting probes for web authentication~\cite{dimva-2020-andrialilanto}.
+%% %
+%% In a similar vein, Jonker \etal showed that, by using the
+%% characterization of the fingerprint surface of 14 web bots, a vast
+%% majority of them can be uniquely identifiable through well-known
+%% fingerprinting techniques~\cite{DBLP:conf/esorics/JonkerKV19}.
+%% %
+%% Amin Azad \etal showed that relying on fingerprinting could be enough to defend
+%% web pages against basic bots, but fails when less popular browsers are
+%% used~\cite{DBLP:conf/dimva/AzadSLN20}.
+%% %
+
+
+%% Acar \etal conducted a large scale study over browser
+%% fingerprinting, showing that 5.5\% of the crawled Alexa top 100,000
+%% web pages conducted canvas
+%% fingerprinting~\cite{DBLP:conf/ccs/AcarEEJND14}.
+%% %
+%% Repeating a similar experiment in 2016, Englehardt and
+%% Narayanan~\cite{DBLP:conf/ccs/EnglehardtN16} conducted a large-scale
+%% analysis on fingerprinting on Alexa top 1 Million web pages to see the
+%% long tail of online tracking.
+%% %
+%% They found that 1.6\% of the crawled web pages used canvas fingerprinting,
+%% but they also discovered three techniques not measured before:
+%% AudioContext fingerprinting, Canvas-Font fingerprinting, and WebRTC
+%% fingerprinting.
+%% %
+%% Lastly, Vastel \etal~\cite{DBLP:conf/sp/VastelLRR18} analyzed the
+%% evolution of fingerprints to link fingerprints belonging to the same
+%% device over time, showing they could track a user on average 51.8
+%% days, and 26\% of devices over 100 days.
+
+%% \para{Browser extensions}
+%% There have also been experiments on how browser extensions can be used
+%% to enhance fingerprinting.
+%% %
+%% Several studies have shown different methods of discovering browser
+%% extensions, ranging from searching for resources in the extension
+%% accessible by the web page~\cite{DBLP:conf/codaspy/SjostenAS17}, how
+%% they can be used to track users~\cite{DBLP:conf/ndss/SjostenAPS19},
+%% and how one can time the accessing to detect every installed browser
+%% extension~\cite{DBLP:conf/uss/Sanchez-RolaSB17}.
+%% %
+%% Starov and Nikiforakis created \textsc{XHound}, showing browser
+%% extensions could be uniquely identifiable based on \gls*{DOM}
+%% modifications~\cite{DBLP:conf/sp/StarovN17}.
+%% %
+%% They found that 9.2\% of the top 10,000 extensions (and 13.2\% of the top
+%% 1000 extensions) can be uniquely identifiable on any domain based on
+%% the \gls*{DOM} modifications alone.
+%% %
+%% These numbers went up to 16.6\% for the top 10,000 extensions and 23\%
+%% for the top 1000 extensions when a domain from the Alexa top 50 was
+%% visited.
+%% %
+%% Looking at how browser extensions made page modifications deemed
+%% unnecessary for the extension's functionality, Starov
+%% \etal~\cite{DBLP:conf/www/StarovLKN19} showed that 5.7\% out of 58,304
+%% extensions were identifiable due to this unnecessary bloat.
+%% %
+%% Guly{\'{a}}s \etal combined browser fingerprinting with additional
+%% data of installed extensions and web
+%% logins~\cite{DBLP:conf/wpes/GulyasSBC18}.
+%% %
+%% They conclude 54.86\% of users with at least one detectable extension
+%% is unique, 19.53\% of users with at least one detectable login is
+%% unique, and 89.23\% of users are unique if they have at least one
+%% detectable extension and one detectable login.
+%% %
+%% Karami \etal presented Carnus to explore the privacy threats of browser
+%% extension fingerprinting~\cite{DBLP:conf/ndss/KaramiISP20}.
+%% %
+%% Carnus generate extension fingerprints by combining both resources accessible by
+%% the web page and \gls*{DOM} modifications, showing that up to 87.92\% of all
+%% extensions that exhibit behavioral fingerprints can be uniquely identified even
+%% when countermeasures are in place.
+%% %
+%% As a final step, Karami \etal show how the installed browser extensions can be
+%% used to infer potentially sensitive information.
+
+%% \para{Combating fingerprinting}
+%% In order to prevent browser fingerprinting, several different
+%% approaches have been proposed.
+%% %
+%% One such approach has been to use machine learning to help detect browser
+%% fingerprinting.
+%% %
+%% Iqbal \etal presented \textsc{FP-Inspector}~\cite{FingerprintingFingerprinters},
+%% and detect fingerprinting with a 99.9\% accuracy while detecting 26\% more
+%% fingerprinting scripts than manually designed heuristics, and shows over 10\% of
+%% the pages in Alexa top 100,000 run fingerprint scripts.
+%% %
+%% Rizzo \etal combine analysis of \JS code with machine learning to detect web
+%% fingerprinters~\cite{pets2021-rizzo}, achieving 94\% accuracy and finding more
+%% than 840 fingerprinting services, 695 of which are unknown to popular tracker
+%% blockers.
+%% %
+%% These services range from new actual trackers to anti-fraud and bot detection.
+%% %
+%% Bird \etal~\cite{DBLP:journals/corr/abs-2003-04463} presented a semi-supervised
+%% machine learning approach to detect fingerprinting, taking advantage that
+%% fingerprinting scripts have similar (but not necessarily identical) \apatterns
+%% when generating fingerprints and identified \(\geq\)94.9\% of resources that
+%% current heuristic techniques identified.
+%% %
+%% By using this approach, Bird \etal also found over one hundred device-class
+%% fingerprinting scripts present on hundreds of domains.
+%% %
+%% This is an approach that can be combined with \name{} and potentially strengthen
+%% the approach by only focusing on observable values that reach a network sink.
+
+%% Another approach to combat fingerprinting is to use browser extensions to
+%% randomize, e.g., the user agent, but as Nikiforakis \etal
+%% showed~\cite{DBLP:conf/sp/NikiforakisKJKPV13}, this can create inconsistencies
+%% between the user agent and other publicly available API
+%% (e.g. \texttt{navigator.platform}).
+%% %
+%% Similarly, Vastel \etal developed
+%% \textsc{FP-Scanner}~\cite{DBLP:conf/uss/VastelLRR18}, a test-suite that
+%% explores browser fingerprint inconsistencies to detect potential
+%% alterations done by fingerprinting countermeasures tools.
+%% %
+%% They demonstrated \textsc{FP-Scanner} could not only find these
+%% inconsistencies but could also reveal the original values, which in
+%% turn could be exploited by fingerprinters to more accurately target
+%% browsers with fingerprinting countermeasures.
+
+%% Instead, as one key aim when conducting device fingerprinting is to
+%% link the newly generated fingerprint to an old one, work has been
+%% focused on breaking the linkability between different sessions.
+%% %
+%% Both Laperdrix \etal~\cite{DBLP:conf/icse/LaperdrixRB15} and
+%% G{\'{o}}mez{-}Boix \etal~\cite{DBLP:conf/ccs/Gomez-BoixFBB19} proposed
+%% virtualization and modular architectures to randomly assemble a
+%% coherent set of components whenever a user wanted to browse the web.
+%% %
+%% This would break the linkability while not having any inconsistencies
+%% between attributes, but the user comfort may go down.
+
+%% Besson \etal~\cite{DBLP:conf/nordsec/BessonBJ14} formalized a privacy
+%% enforcement based on a randomization defense using quantitative
+%% information-flow showing how to synthesize a randomization mechanism that
+%% defines the configurations for each user.  They found that more
+%% efficient privacy enforcement often leads to lower usability, i.e.,
+%% users have to switch to other configurations often.
+%% %
+%% Ferreira Torres \etal~\cite{DBLP:conf/esorics/TorresJM15} proposed
+%% generating unique fingerprints to be used on each visited web page,
+%% making it more difficult for third parties to track the same user over
+%% multiple web pages.
+%% %
+%% FaizKhademi \etal~\cite{DBLP:conf/dbsec/FaizKhademiZW15} proposed the detection of
+%% fingerprinting by monitoring and recording the activities by a web
+%% page from the time it started loading.
+%% %
+%% Based on the recording, they were able to extract metrics related to fingerprinting
+%% methods to build a signature of the web page to distinguish normal web
+%% pages from fingerprinting web pages.
+%% %
+%% If the web page is deemed to be fingerprinting, the access to the browser is limited
+%% e.g. by limiting the number of fonts allowed to be enumerated, by adding randomness
+%% to attribute values of the \texttt{navigator} and \texttt{screen}
+%% objects, and noise to canvas images that are generated.
+
+%% Nikiforakis \etal~\cite{DBLP:conf/www/NikiforakisJL15} proposed using
+%% randomization policies, which are protection strategies that can be
+%% activated when certain criteria are met.
+%% %
+%% In particular, they added randomization to offset measurements of HTML
+%% elements (which is used when doing e.g. font enumeration) and plugin
+%% enumeration.
+%% %
+%% Similarly, Laperdrix \etal~\cite{DBLP:conf/essos/LaperdrixBM17}
+%% proposed adding randomness to some more complex parts of the \gls*{DOM}
+%% API: canvas, web audio API, and the order of \JS object properties.
+%% %
+%% Randomization has also been used to combat fingerprinting via browser
+%% extensions by Trickel \etal~\cite{DBLP:conf/uss/TrickelSKND19} that
+%% proposed randomizing paths to web-accessible resources to prevent
+%% probing attacks, changing ID and class names which are injected to
+%% change the behavioral fingerprint.
+
+%% Adding randomness to mitigate canvas, WebGL, and AudioContext
+%% fingerprinting has now been implemented by the Brave
+%% browser~\cite{brave-anti-fp}, adding to their already implemented
+%% fingerprinting protections~\cite{brave-fingerprinting-protections}.
+%% %
+%% Other browser vendors are also implementing anti-fingerprinting
+%% measures.
+%% %
+%% Firefox introduced Enhanced Tracking
+%% Protection~\cite{firefox-enhanced-tracking-protection}, which would
+%% allow third-party cookies to be blocked.
+%% %
+%% This has later been expanded to also block all third-party requests to
+%% companies that are known to participate in
+%% fingerprinting~\cite{firefox-anti-fp}; a feature that is also found in Microsoft
+%% Edge~\cite{edge-anti-fp}.
+%% %
+%% Safari applies similar restrictions on cookies as Firefox, and also
+%% presents a simplified version of the system configuration to trackers,
+%% making more devices look identical~\cite{safari-anti-fp}.
+%% %
+%% The Tor browser aims to make all users look identical to resist
+%% fingerprinting~\cite{tor-anti-fp}.
+%% %
+%% Unfortunately, this means that as soon as a user maximizes the browser
+%% window or installs a plugin, their fingerprint will divert from the
+%% unified Tor browser fingerprint~\cite{tor-fp-problem}.
+%% %
+%% Similarly, as all Tor browsers aim to look identical, Khattak \etal
+%% showed they can be a target for blocking, showing 3.67\% of the Alexa
+%% top 1,000 pages blocked access to Tor
+%% users~\cite{DBLP:conf/ndss/KhattakFAJSMPM16}.
+%% %
+%% Lastly, of the well-known browser vendors, Chrome has announced ``The
+%% Privacy Sandbox''~\cite{chrome-privacy-sandbox}, where they are
+%% planing on combat fingerprinting by implementing a privacy
+%% budget~\cite{chrome-anti-fp}.
+%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusion}
+\label{sec:conclusion}
+We have presented \name{}, a principled approach to detecting
+fingerprinting on the web using observable information-flow control.
+%
+Answering RQ1 on the essence of fingerprinting: \name{} identifies the
+essence of fingerprinting based on the pattern of (i) gathering
+information from a wide browser API surface (multiple browser-specific
+sources), and (ii) communicating the information to the network via a
+network sink.
+%
+Using this pattern, \name{} can clearly distinguish fingerprinting
+from similar types of scripts such as analytical scripts and
+polyfills.
+%
+For RQ2 on exposing fingerprinting: \name{} exposes the pattern from
+RQ1 by monitoring based on observable information flow tracking.
+%
+To implement \name{}, we have leveraged, extended, and deployed
+\jsflow, a state-of-the-art information flow tracker for JavaScript,
+in a browser.
+%
+We have demonstrated the effectiveness to spot fingerprinting on the
+web by \name{} by evaluating it on two categories of web pages:
+non-fingerprinting (pages that perform analytics, use polyfills, and
+show ads), and fingerprinting (which are divided into the classes of
+authentication, bot detection, and fingerprinting-enhanced pages from
+the Alexa list).
+%
+Our results reveal different extent of fingerprinting in the web
+pages, ranging from no evidence of fingerprinting in the
+non-fingerprinting pages, to some evidence of fingerprinting in the
+authentication and bot detection pages, to full-blown evidence in the
+fingerprinting-enhanced pages from the Alexa list.
+
+\para{Acknowledgments}
+Thanks are due to Pete Snyder for the stimulating discussions on the topic of
+browser fingerprinting.
+%
+This work was partially supported by the Swedish Foundation for Strategic
+Research (SSF) and the Swedish Research Council (VR).
+
+
+
+\bibliographystyle{abbrv}
+\bibliography{literature}
+\appendices
+\crefalias{section}{appendix}
+
+%% \begin{table*}[ht]
+%%   \section{Table Over Used Sinks}
+%%   \label{app:table}
+%%   \centering
+%%   \caption{Table showing the sinks used by the scripts on the domains to
+%%     exfiltrate the maximum overlap of (potential) fingerprint value. Only sinks
+%%     that can be used to send data (e.g. \texttt{document.cookie}, network
+%%     requests, etc.) is shown. The entries are sorted by the two categories.}
+%%   %\resizebox{\columnwidth}{!}{
+%%     \begin{tabular}{ l | l | l  }
+%%       Domain & Class & Sink \\
+%%       \hline
+%%       %%% Non-fingerprinting
+%%       \alexa  & --- & \texttt{Image.src} \\
+%%       \dailymail & --- & \texttt{document.querySelectorAll.src} \\
+%%       \ebay & --- & \texttt{HTMLFormElement.setAttribute} \\
+%%       \gamespot & --- & \texttt{document.cookie} \\
+%%       \microsoft & --- & \texttt{navigator.sendBeacon} \\
+%%       \stackoverflow  & --- & \texttt{navigator.sendBeacon} \\
+%%       \theguardian & --- & \texttt{Image.src} \\
+%%       \washingtonpost  & --- & \texttt{navigator.sendBeacon} \\
+%%       \wired & --- & \texttt{document.createElement.src} \\
+%%       \zoom  & --- & \texttt{HTMLFormElement.setAttribute} \\
+%%       \hline
+%%       \aktuality & Alexa list & \texttt{document.createElement.src}, \texttt{XMLHttpRequest.open} \\  %%% Alexa list
+%%       \cit  & Authentication & \texttt{HTMLFormElement.setAttribute} \\  %%% Authentication
+%%       \citibank  & Authentication & \texttt{XMLHttpRequest.send} \\  %%% Authentication
+%%       \creditsuisse & Authentication & \texttt{HTMLFormElement.appendChild} \\  %%% Authentication
+%%       \frankmotorsinc & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+%%       \jd & Alexa list & \texttt{XMLHttpRequest.send} \\  %%% Alexa list
+%%       \kinoprofi & Alexa list & \texttt{HTMLFormElement.setAttribute} \\  %%% Alexa list
+%%       \lgcom & Alexa list & \texttt{HTMLFormElement.setAttribute} \\  %%% Alexa list
+%%       \lufthansa & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+%%       \olx & Alexa list & \texttt{document.cookie} \\  %%% Alexa list
+%%       \pnc & Authentication & \texttt{document.createElement.src} \\  %%% Authentication
+%%       \rei & Alexa list & \texttt{document.cookie} \\  %%% Alexa list
+%%       \rezka & Alexa list & \texttt{HTMLFormElement.setAttribute} \\  %%% Alexa list    
+%%       \santanderbank & Authentication & \texttt{XMLHttpRequest.send} \\  %%% Authentication
+%%       \sciencedirect & Alexa list & \texttt{document.cookie} \\  %%% Alexa list    
+%%       \scribd & Alexa list & \texttt{document.createElement.src} \\  %%% Alexa list
+%%       \samsonite & Bot detection & \texttt{HTMLFormElement.setAttribute} \\  %%% Bot detection
+%%       \stubhub & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+%%       \ultimateguitar & Alexa list & \texttt{document.createElement.src}, \texttt{navigator.sendBeacon} \\  %%% Alexa list
+%%       \whitepages  & Bot detection & \texttt{XMLHttpRequest.send} \\  %%% Bot detection
+%%     \end{tabular}
+%%   %}
+%%   \label{tab:sinks}
+%% \end{table*}
+
+\begin{figure*}[ht!]
+  %%% Add section in the figure to make sure they are on the same page...
+  %\vspace{-8em}
+  \section{Heatmaps of the Two Categories Against \imprintjs}
+  \label{app:heatmaps_categories_imprintjs}
+  \centering
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Non-fingerprinting}
+    \label{fig:non-fp-heatmap_imprintjs}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 24.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 24.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/non_fp_imprintjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \vspace{5em}
+  \end{subfigure}
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Fingerprinting}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 24.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 24.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/fp_imprintjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:fp-heatmap_imprintjs}
+  \end{subfigure}
+  \vspace{6em}
+  \caption{Heatmaps for the two categories when compared against \imprintjs. For each row, the column identifies
+  the conditional probability of the feature of the column given the feature of the row. The probability is interpreted as a gradient
+  between yellow (0\% probability) and red (100\% probability).}
+  \label{fig:heatmaps_imprintjs}
+\end{figure*}
+
+\begin{figure*}[ht!]
+  %%% Add section in the figure to make sure they are on the same page...
+  \section{Heatmaps of Fingerprinting Classes Against \fpjs}
+  \label{app:heatmaps_fpjs}
+  \centering
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Authentication}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 29.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 29.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/authentication_fpjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:authentication_class_heatmap_fpjs}
+    \vspace{8em}
+  \end{subfigure}
+  %
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Bot detection}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 29.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 29.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/bot_detection_fpjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:bot_detection_class_heatmap_fpjs}
+  \end{subfigure}
+\end{figure*}
+
+\begin{figure*}[ht!]\ContinuedFloat
+  \centering
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    %\vspace{-2cm}
+    \caption{Alexa lists}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 29.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 29.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/alexa_lists_fpjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:alexa_class_heatmap_fpjs}
+  \end{subfigure}
+  \vspace{6em}
+  \caption{Heatmaps for the different fingerprinting classes when compared against \fpjs. For each row,
+    the column identifies the conditional probability of the feature of the
+    column given the feature of the row. The probability is interpreted as a
+    gradient between yellow (0\% probability) and red (100\% probability).}
+  \label{fig:heatmaps_fp_classes_fpjs}
+\end{figure*}
+
+
+\begin{figure*}[ht!]
+  %%% Add section in the figure to make sure they are on the same page...
+  \section{Heatmaps of Fingerprinting Classes Against \imprintjs}
+  \label{app:heatmaps_classes_imprintjs}
+  \centering
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Authentication}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 24.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 24.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/authentication_imprintjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:authentication_class_heatmap_imprintjs}
+    \vspace{8em}
+  \end{subfigure}
+%% \end{figure*}
+%% \begin{figure*}[ht!]\ContinuedFloat
+%%   \centering
+  \begin{subfigure}{0.51\textwidth}
+    \raggedleft
+    \caption{Bot detection}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 24.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 24.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/bot_detection_imprintjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:bot_detection_class_heatmap_imprintjs}
+  \end{subfigure}
+\end{figure*}
+
+\begin{figure*}[ht]\ContinuedFloat
+  \centering
+  \begin{subfigure}{0.51\textwidth}
+    %\vspace{4em}
+    \raggedleft
+    \caption{Alexa lists}
+    \small
+    \begin{gnuplot}[terminal=epslatex,terminaloptions={font ",1"},scale=.85]
+      set lmargin 0
+      #set tmargin 0
+      set rmargin 0
+      #set bmargin 10
+      unset key
+      set view map scale 1
+      set style data lines
+      set xtics border in scale 0,0 mirror norotate autojustify
+      set xtics rotate by 52 offset 0,-5 right
+      set xtics ()
+      set ytics border in scale 0,0 mirror norotate autojustify
+      set ytics norangelimit offset -5,0 #rotate by 60
+      set ytics ()
+      set ztics border in scale 0,0 nomirror norotate  autojustify
+      # unset cbtics
+      # unset colorbox
+      set rtics axis in scale 0,0 nomirror norotate  autojustify
+      #set title "Heatmap"
+      set xrange [ -0.5 : 24.5 ] noreverse nowriteback
+      set yrange [ -0.5 : 24.5 ] noreverse nowriteback
+      # set cblabel "Number of Integrity Violations"
+      set cbrange [ 0.00000 : 100 ] noreverse nowriteback
+      # set palette rgbformulae  -7, 2, -7
+      #
+      set palette model RGB
+      set palette defined ( 0 "#ffeda0", 1 "#feb24c", 2 "#f03b20" )
+      #
+      #30,31,32
+      #23,28,3
+      #34,35,36
+      #-7, 2, -7
+      x = 0.0
+      ## Last datafile plotted: "$map3"
+      plot 'heatmap_files/alexa_lists_imprintjs.dat' matrix columnheaders rowheaders using 1:2:3 with image pixels
+    \end{gnuplot}
+    \label{fig:alexa_class_heatmap_imprintjs}
+  \end{subfigure}
+  \vspace{6em}
+  \caption{Heatmaps for the different fingerprinting classes when compared against \imprintjs. For
+    each row, the column identifies the conditional probability of the feature of
+    the column given the feature of the row. The probability is interpreted as a
+    gradient between yellow (0\% probability) and red (100\% probability).}
+  \label{fig:heatmaps_fp_classes_imprintjs}
+\end{figure*}
+\end{document}

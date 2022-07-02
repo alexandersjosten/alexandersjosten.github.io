@@ -26,8 +26,8 @@
 }
 
 .contact {
-    width: 440px;   
-    margin-left: 360px;
+    width: 500px;   
+    margin-left: 300px;
     height: 125px;
     text-align: left;
     position: absolute;
@@ -51,6 +51,7 @@ p {
     margin: 0px;
     margin-left: 20px;
     margin-right: 20px;
+    margin-top: 10px;
 }
 
 p.info {
@@ -91,7 +92,7 @@ a {
     color: black;
 }
 
-a.chalmersInfo {
+a.universityInfo {
     color: #546B73;
     background: rgba(238, 238, 238, 0.5);
 }
